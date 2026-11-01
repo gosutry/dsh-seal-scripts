@@ -15,7 +15,8 @@
     "index.js",
     "cordis.patch.yml",
     "lib",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.1.7-rc.2 <1.0.0"
@@ -49,5 +50,13 @@
     "compaction",
     "recall",
     "deepseek-harness"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gosutry/dsh-session-recall.git"
+  },
+  "homepage": "https://github.com/gosutry/dsh-session-recall#readme",
+  "bugs": {
+    "url": "https://github.com/gosutry/dsh-session-recall/issues"
+  }
 }
