@@ -1,0 +1,53 @@
+{
+  "name": "dsh-session-recall",
+  "version": "0.3.14",
+  "private": false,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "description": "DSH 回顾插件：压缩即回顾，按自然日衰减载入，可在设置页管理会话与回顾；选项页可全量加载、切提醒通道、停止降低、强制载入级别；语言跟 DSH 设置走，回顾文件里的中文标记按语言换字显示。",
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "lib",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.7-rc.2 <1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "memory",
+    "compaction",
+    "recall",
+    "deepseek-harness"
+  ]
+}
