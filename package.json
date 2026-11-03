@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-recall",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "private": false,
   "type": "module",
   "main": "index.js",

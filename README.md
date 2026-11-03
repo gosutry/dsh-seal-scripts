@@ -2,7 +2,9 @@
 
 > 压缩即回顾。压缩一次，留一份回顾；按自然日衰减，需要时能读回来。
 
-版本 `0.3.15` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+版本 `0.3.16` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+
+0.3.16 把「什么时候才允许固化」写准：调用 `session_tool_create_write` 之前，脚本必须已经跑通；写进去的是跑通的那一份，不是装好再改的草稿。理由是缓存——装完再改一次，整段上下文要重发一遍。同一版清掉了几处含糊指代：`a proven path` → `a proven command chain`、`just ran it here` → `just ran those commands here`、`freeze it with` → `install them with`、`加 dryRun: true` → `给 session_tool_call 加 dryRun: true`。
 
 0.3.15 补两处「说漏」：`run` 的声明原来只写了 `node/.js`、`cmd/.bat`，而实现一直认 `.mjs`/`.cjs` 和 `.cmd`——现在声明与实现对齐，并补上 ps1 在 Windows 上跑的是 Windows PowerShell 5.1、node 跑的是宿主运行时（PATH 上没有 node）。另外 `session_tool_create_write` 加了一句前置条件：**冻结前每个脚本都必须在当前环境真跑过一次**。五条描述合计 2,964 字符（0.3.14 是 2,963，净增 1，仍是腾挪来的）。
 
