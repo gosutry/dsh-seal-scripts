@@ -2,7 +2,7 @@
 
 > 压缩即回顾。压缩一次，留一份回顾；按自然日衰减，需要时能读回来。
 
-版本 `0.4.2` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+版本 `0.4.3` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
 
 ## 支持的宿主版本
 
@@ -10,6 +10,46 @@
 
 宿主缺哪一块能力就关哪一块，其余照常，设置页会写明缺了什么；
 探测表在 `lib/host/capabilities.js`。缺原生 zstd 的 Node 走 `lib/core/zstd-js.js` 的内置解码器，回顾与会话标题都能读。
+
+## 0.4.3：「自创工具」页能导入 / 导出了
+
+工具组的备份与搬家以前只能整目录拷。现在「自创工具」页最下面多了两个键：**导入** / **导出**。
+
+**导出**：把工具组目录（`$DSH_HOME/session-memory/toolSequence`，页面上「工具路径」那一行指的就是它）
+打成 `toolSequence.zip`，**压缩率 0**（zip 的 store 方式：只打包，不压缩）。
+落点不是浏览器下载，而是**当前会话所在的工作区文件夹**——文件名固定 `toolSequence.zip`，同名直接覆盖并回执写明；
+页面会把完整路径念出来，`ls` 一下就在那儿。
+包里跳过 `_runs/`（运行溢写，是输出不是工具本身）和 `*.bak-*` / `*.tmp-*` 这类重装残留；
+`_index.json` 与每个 `<id>/` 目录原样进包。
+
+**导入**：选一个 `toolSequence.zip`，先**预演**——只解析不写盘，弹出一个确认框写明「读到几个工具脚本、其中几个会覆盖本机同名的、几项不收」，
+点「确认导入」才真写（弹窗结构照 `dsh-persona-select` 的 `ConfirmDialog`：固定遮罩、`role="dialog"`、Esc 取消）。写盘是「每个 `<id>/` 先在临时目录落全、再整体 rename 换上去」
+（和 `session_tool_create_write` 同一套做法，不给读的人看见装到一半的工具脚本）；被覆盖的旧目录留一份 `<id>.bak-<时间戳>`。
+
+**这条界线要说清楚**：包里的 `_index.json` **不采信**。索引是本机的注册表，直接盖会丢掉本机别的工具脚本，
+所以按落地后的文件重建这一份索引，别的一条不动——导入 `local-only` 之外的东西不会把 `local-only` 弄没。
+
+**读包能力**：store（0）和 deflate（8）都认，所以别人用系统 zip 压的包也能导；包外面手工多套了一层
+`toolSequence/` 会自动剥掉一层；zip64、加密包、`../` 越界路径、绝对路径、盘符路径一律明确拒绝，不静默跳过。
+导出上限 24 MB，导入请求体上限 48 MB（base64 后）。
+
+**预览框也换成带滑条的了**：以前预览框的滚动条是浏览器默认的细条，手机上不好拖；
+现在和另外几个长列表共用 `.recall-scroll`——20px 宽、48px 最短滑块、可拖动。
+
+**顺手修的**：整页滚动。加了两排按钮之后「自创工具」页不再保证一屏装得下，所以这一页整页也套上了 `.recall-scroll`
+（选项页仍然不套）。
+
+### 这一版的验证方式
+
+| 对象 | 怎么验的 |
+|---|---|
+| zip 写读 | 自己写的 store 包用 Python `zipfile` 独立对账：CRC 自洽、每一项 `ZIP_STORED` |
+| 导出落盘 | 真 http 端点 + 真工作区目录；盘上字节、回执字节、Python 读到的条目数三者互相对账 |
+| 导入 | 真包导进另一份工具组目录，再与原目录**逐字节**比对；同名覆盖留 `.bak-`；本机独有目录不丢 |
+| 参数与错误路径 | `cwd` 缺失 / 相对路径 / 不存在 / 磁盘根，四种都拒；坏包、越界包、绝对路径包、空包，四种都拒 |
+| 界面 | 真 jsdom + 真 React 18 跑插件自己的 `lib/client.js`：预览框 class 与注入的滚动条 CSS、两个按钮、导出回执路径、导入预演→确认→落地→清单刷新、取消不写盘 |
+
+容器里的 Chromium 渲不起来（`--dump-dom` 都不吐节点），所以界面这一档用的是 jsdom，不是真浏览器。
 
 ## 0.4.2：换索引、删锁、自带 zstd 解码器
 
@@ -342,6 +382,17 @@ $DSH_HOME/session-memory/toolSequence/
     _runs/                      输出溢写
 ```
 
+### 导入 / 导出（0.4.3）
+
+整目录搬家用「自创工具」页底部的两个键，详见上面 0.4.3 那一节：
+导出 = 打成 `toolSequence.zip`（压缩率 0）直接写进当前会话的工作区文件夹；
+导入 = 选一个 `toolSequence.zip`，**先预演再确认**，只收 `<id>/` 目录，索引按落地文件重建。
+
+```bash
+# 导出的包在任何机器上都能直接解开（store，不压缩）
+python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print([(i.filename,i.compress_type) for i in z.infolist()])" toolSequence.zip
+```
+
 ### 三个工具
 
 | 工具 | 干什么 | 关键参数 |
@@ -401,7 +452,9 @@ $DSH_HOME/session-memory/toolSequence/
 「自创工具」页（0.3.1 起；0.3.10 加问号与工具路径）：标题 `工具组清单` 右边一颗问号，点开说明
 「这一页在干什么、怎么让模型把一条跑通的链固化成工具组」；标题下面一行显示工具组目录
 （`$DSH_HOME/session-memory/toolSequence`，就是 `session_tool_call` 取脚本的地方）；
-再往下是「注入工具组清单」开关与预览框。
+再往下是「注入工具组清单」开关与预览框（0.4.3 起预览框自带 20px 宽的滑条），
+最下面只有两个键：**导入** / **导出**（0.4.3，没有标题、没有说明段落）。导出等于把工具组目录打成 `toolSequence.zip`
+写进当前会话的工作区文件夹；导入选完包先弹确认框，点确认才写盘。
 
 ## 选项页（0.2.0 起；0.2.1 去掉滚动条；0.2.8 加总开关；0.3.10 加自动回顾）
 
@@ -680,6 +733,8 @@ lib/core/tool.js            session_mem_read（一条条读）/ session_mem_writ
 lib/core/zstd.js            多帧 zstd 解压（原生优先，缺了走内置）
 lib/core/zstd-js.js         纯 JS zstd 解码器（无字典 / 多帧 / raw·RLE·Huffman·FSE）
 lib/core/project-key.js     工作区目录编码
+lib/core/zip.js             极简 zip：写只用 store（压缩率 0），读认 store / deflate
+lib/core/tool-transfer.js   工具组的导出（落盘）与导入（预演 / 确认 / 索引重建）
 lib/host/register.js         HTTP 端点注册入口（路表 + 登录态/同源/错误码映射）
 lib/host/routes/*.js        端点按域拆开：sessions / memories / options / tools
 lib/host/api.js             兼容薄壳（只转发 registerApi，档 1–3 的 import 路径）
