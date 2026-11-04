@@ -2,13 +2,70 @@
 
 > 压缩即回顾。压缩一次，留一份回顾；按自然日衰减，需要时能读回来。
 
-版本 `0.4.1` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+版本 `0.4.2` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+
+## 支持的宿主版本
+
+`@deepseek-ai/dsh` `>=0.2.1-rc.2 <1.0.0`（见 `package.json` 的 `peerDependencies`）。
+
+宿主缺哪一块能力就关哪一块，其余照常，设置页会写明缺了什么；
+探测表在 `lib/host/capabilities.js`。缺原生 zstd 的 Node 走 `lib/core/zstd-js.js` 的内置解码器，回顾与会话标题都能读。
+
+## 0.4.2：换索引、删锁、自带 zstd 解码器
+
+**这一版改了磁盘上回顾目录的组织方式**，升级时请看完这一段。
+
+**1. 载入索引从「一个共享文件」改成「每份回顾一个边车」。**
+
+```
+旧：session-memory/<工作区key>/
+      _assembly.json          ← 所有条目挤在一个文件里，读-改-写要加锁
+      _assembly.lock/         ← 目录锁
+      20261028-055942-96358e1b.md
+
+新：session-memory/<工作区key>/
+      20261028-055942-96358e1b.md     回顾正文（格式没变，仍可直接手改）
+      20261028-055942-96358e1b.json   这份回顾的元数据（时间/深度/锁定）
+      _assembly.json.migrated-<时间戳>  迁移遗留的旧索引（永久保留，不自动删）
+```
+
+**不变量变了**：以前是「索引说有哪些回顾」，现在是「**目录里的 `.md` 就是回顾**」。
+边车只是它的缓存——边车丢了会按文件修改时间自动补回来，孤儿边车（正文已删）会被清掉。
+于是「条目在、文件没了」「文件没了、条目又回来」这两类事故在结构上不可能再发生。
+
+**2. 目录锁整段删除了。** 没有共享文件，就不需要锁。强杀进程之后不会再出现
+「这个工作区从此不再生成回顾，而且不报错」。
+
+**3. 自带纯 JS 的 zstd 解码器。** 以前在 Node 22.15 之前的机器上，
+会话日志解不开 → 设置页里每个会话都叫「空会话」（0.4.1 之前是静默的，0.4.1 起会提示读不出来）。
+0.4.2 起改用内置解码器，标题真的读得出来；有原生 `zlib.zstdDecompressSync` 时仍走原生（快一个数量级）。
+内置解码器**不支持字典**；真遇到带字典的帧会明确报 `zstd-unsupported`，不会返回半个 buffer。
+
+**4. 包入口只导出 3 个符号**（`apply` / `inject` / `name`，宿主加载契约需要的全部）。
+以前导出 42 个，实测没有任何外部消费者。
+
+**5. 宿主格式变更有了告警。** 插件要自己读 `session.v4.jsonl.zstd`（宿主 header 里没有标题），
+这是三处「复刻」。现在它们集中在 `lib/host/host-contract.js` 登记，拆解时做一次廉价探测；
+出现未知日志名时写进 `_health.json`，设置页会显示「宿主会话格式可能有变」。
+
+### 升级时你会看到的一次性现象
+
+- **第一次打开某个工作区的回顾列表会多花几十毫秒**——在做 `_assembly.json → 边车` 的迁移。
+- 迁移**只做一次**，幂等；失败会回滚已写的边车，旧索引原样留着。
+- 回顾目录里会**多出一批 `.json` 文件**（每份回顾一个），以及一个 `_assembly.json.migrated-<时间戳>`。
+- 旧索引**永久保留**，不会被任何自动化删掉。
+
+### 想回退
+
+把 profile 的 `package.json` 里 `dsh-seal-scripts` 那一行的 `link:` 指回 0.4.1 的目录，
+再把 `node_modules/dsh-seal-scripts` 软链接指向它，重启宿主即可。旧索引还在，
+新写的边车对 0.4.1 无影响（0.4.1 不读它），只是那些回顾的锁定/深度在 0.4.1 里看不到。
 
 0.4.1 修「晚一步」：工具的装卸点从 `agent/pre-step` 挪到选项写入之后。
 
 原因是时序。DSH 的 `Agent.preStep()` 里，`systemPrompt.assemble()`（拍工具表快照）在 `dispatch.waterfall("agent/pre-step")` **之前**执行（`dsh-agent-loop/lib/index.js:907` 早于 `:909`）。所以 0.4.0 在 pre-step 里注册的工具，那一轮的请求已经组好了，要再多等一轮才看得见。
 
-现在 `POST /api/session-recall.options` 写完 `_options.json` 立刻调一次 `syncTools()`（`lib/host/api.js` 的选项路由），赶在下一次 `assemble()` 之前。用户点完开关，**下一条消息**的工具表就是新的，不用再等第二轮。pre-step 里那次保留当兜底（幂等，对上了就什么都不做）。
+现在 `POST /api/session-recall.options` 写完 `_options.json` 立刻调一次 `syncTools()`（`lib/host/routes/options.js` 的选项路由），赶在下一次 `assemble()` 之前。用户点完开关，**下一条消息**的工具表就是新的，不用再等第二轮。pre-step 里那次保留当兜底（幂等，对上了就什么都不做）。
 
 边界没变：正在发出的那一次请求，工具表已经定死，任何插件都插不进去。能缩短的是「点完 → 下一条消息」之间的空转。
 0.4.0 工具按开关装载，不再五个全挂。设置页标题从「回顾管理」改成「工具(脚本)管理」。
@@ -389,14 +446,15 @@ $DSH_HOME/session-memory/toolSequence/
 没选回顾时，框里是这一刻真正会被载入的整段文字 —— 和注入走同一个装配函数，字字相同；
 选中某一条时，框里只显示那一条自己会被注入成什么（同一个 `renderEntry`，不是另写一套）；
 再点一次列表头就回到整段，并清掉正在选中的那条。
-框下面一个「删除这条回顾」，二次确认，先删文件再从载入文件里摘掉条目。
+框下面一个「删除这条回顾」，二次确认，先删正文再删它的边车。
 
 ## 数据在哪
 
 ```
 $DSH_HOME/session-memory/<工作区 key>/
-    _assembly.json                    载入文件（运行期唯一真相）
-    20261028-055942-96358e1b.md      一次压缩一份回顾
+    20261028-055942-96358e1b.md      一次压缩一份回顾（唯一真相）
+    20261028-055942-96358e1b.json    这一份的载入索引（缓存；丢了按 mtime 重建）
+    _assembly.json.migrated-*        旧版单文件索引的迁移遗留（永不自动删）
 $DSH_HOME/session-memory/toolSequence/      0.3.0 工具组（机器级，所有工作区共用）
     _index.json                      总索引（查找、哈希、注入都读它）
     <工具脚本 id>/toolScript.json            这一套的清单（入口、步骤、参数、出处、哈希）
@@ -610,7 +668,8 @@ lib/client.js               设置页（浏览器半，含中英词条）
 lib/core/index.js           插件主体
 lib/core/render.js          会话事件 → 原文
 lib/core/memory-file.js     回顾文件的生成 / 解析 / 改字段
-lib/core/store.js           目录布局、原子写、文件锁、载入文件
+lib/core/store.js           目录布局、原子写、边车索引（无锁）
+lib/core/migrate.js         旧 _assembly.json -> 每份一个 .json 边车（一次性、可回滚）
 lib/core/assembly.js        自然日衰减、装配、载入预览、过大诊断
 lib/core/settings.js        选项（_options.json）的默认值、归一化与原子写
 lib/core/lang.js            语言词条与通配键换字（zh / en）
@@ -618,12 +677,16 @@ lib/core/locale.js          语言从哪来（_locale.json，跟 DSH 设置走�
 lib/core/diary.js           关键词/日记空着时的提醒（纯读盘，不写盘）
 lib/core/search.js          候选顺序（自己→子级→平级→外圈）与一条条给的候选
 lib/core/tool.js            session_mem_read（一条条读）/ session_mem_write（读对话原文 · 一次 writes 批量写）
-lib/core/zstd.js            多帧 zstd 解压
+lib/core/zstd.js            多帧 zstd 解压（原生优先，缺了走内置）
+lib/core/zstd-js.js         纯 JS zstd 解码器（无字典 / 多帧 / raw·RLE·Huffman·FSE）
 lib/core/project-key.js     工作区目录编码
-lib/host/api.js             HTTP 端点（含 locale）
+lib/host/register.js         HTTP 端点注册入口（路表 + 登录态/同源/错误码映射）
+lib/host/routes/*.js        端点按域拆开：sessions / memories / options / tools
+lib/host/api.js             兼容薄壳（只转发 registerApi，档 1–3 的 import 路径）
 lib/host/delete.js          真删（热删除 + rm -rf）
 lib/host/compact-delete.js  删除并回顾
 lib/host/lifecycle.js       抓 agents 句柄
 lib/host/summary.js         会话标题与摘要
+lib/host/host-contract.js   宿主私有格式的三处复刻登记 + 廉价变更探测
 test/                       测试与探针
 ```
