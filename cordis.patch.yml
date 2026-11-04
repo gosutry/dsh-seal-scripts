@@ -1,6 +1,6 @@
-# dsh-session-recall toolScript patch：往 host 的 loader 里插一行插件。
+# dsh-seal-scripts toolScript patch：往 host 的 loader 里插一行插件。
 # 浏览器半由 package.json 的 dsh.client 声明发现；
 # host 半就是这个 index.js 本身，同一个插件既管拆解也注册端点。
 - insert:
-    - id: dsh-session-recall
-      name: dsh-session-recall
+    - id: dsh-seal-scripts
+      name: dsh-seal-scripts

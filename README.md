@@ -1,8 +1,17 @@
-# dsh-session-recall
+# dsh-seal-scripts
 
 > 压缩即回顾。压缩一次，留一份回顾；按自然日衰减，需要时能读回来。
 
-版本 `0.3.16` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+版本 `0.3.17` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+
+0.3.17 改名 `dsh-session-recall` → `dsh-seal-scripts`，「冻结」这个词在英文侧统一成`seal`：
+工具声明两处（`Seal a proven command chain into a toolScript`、`Seal only what repeats`）、
+系统提示词标题行两处（`Nothing sealed yet.`、`Whole scripts, sealed: the exact commands from paths that worked.`）、
+引导语一处（`summarize it into a toolScript / seal it as a workflow`）。
+其中三处不能逐词替换：`seal X as Y` 在英文里不成立，改成 `seal ... into ...`；`sealed from` 不通，改成「封好了 + 说明是什么」的并列。
+英文问号气泡里那个词统一成 `toolScript`（原来写 `a tool`，和标签页的 `toolList` 打架），第二处缩成 `build one` 避免重复。
+中文侧「把那套总结成经验」改成「总结成工具」、「固化成流程」改成「封装成流程」，按字面匹配的三条测试断言同步改。
+设置与回顾不受影响：状态全在 `$DSH_HOME/session-memory/` 下按路径存，与插件 id 无关。
 
 0.3.16 把「什么时候才允许固化」写准：调用 `session_tool_create_write` 之前，脚本必须已经跑通；写进去的是跑通的那一份，不是装好再改的草稿。理由是缓存——装完再改一次，整段上下文要重发一遍。同一版清掉了几处含糊指代：`a proven path` → `a proven command chain`、`just ran it here` → `just ran those commands here`、`freeze it with` → `install them with`、`加 dryRun: true` → `给 session_tool_call 加 dryRun: true`。
 
@@ -99,6 +108,7 @@ for f in ~/.dsh/session-memory/toolSequence/*/bundle.json; do mv "$f" "$(dirname
 
 0.3.8 只改命名，不动机制。三层指代统一成一条线（从单件到整体）：
 **工具脚本**（原「套件」，英文 toolScript）→ **工具组**（原「工具库」，toolSequence）→ **自创工具**（原设置页「经验」，toolList）。
+0.3.17 起，引导语里那个触发词写作「总结成工具」，英文对应 `toolScript`——产物是单件，不是清单。
 三个工具的函数名（`session_tool_create_read` / `session_tool_create_write` / `session_tool_call`）保持不变。
 这一版只动面向人与模型的文本，**参数名、清单文件名、目录、API 端点、提示词段名、开关键当时都按契约保持原样**——
 它们全部在 0.3.9 里改掉了，见上表。
@@ -349,7 +359,7 @@ $DSH_HOME/session-memory/toolSequence/
 底部固定两个按钮 `删除` / `删除并回顾`，没选中时灰掉。
 
 **右侧拖条**：四个容器共用 `.recall-scroll` —— 整个会话页、每个工作区、整个回顾页、载入回顾框。
-`::-webkit-scrollbar` 是伪元素，内联样式改不到，所以在 `apply()` 里注入一次 `<style id="dsh-session-recall-css">`。
+`::-webkit-scrollbar` 是伪元素，内联样式改不到，所以在 `apply()` 里注入一次 `<style id="dsh-seal-scripts-css">`。
 
 **回顾标签**：上面是日历（有回顾的日子加粗，点两天选区间），下面**只有一个可展开的列表头**；
 **日历和列表是连着的**：选完区间，列表只留区间内那几天压出来的回顾，标题行跟着显示「区间内 N 条」，

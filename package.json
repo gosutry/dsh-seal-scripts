@@ -1,6 +1,6 @@
 {
-  "name": "dsh-session-recall",
-  "version": "0.3.16",
+  "name": "dsh-seal-scripts",
+  "version": "0.3.17",
   "private": false,
   "type": "module",
   "main": "index.js",
@@ -53,10 +53,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gosutry/dsh-session-recall.git"
+    "url": "git+https://github.com/gosutry/dsh-seal-scripts.git"
   },
-  "homepage": "https://github.com/gosutry/dsh-session-recall#readme",
+  "homepage": "https://github.com/gosutry/dsh-seal-scripts#readme",
   "bugs": {
-    "url": "https://github.com/gosutry/dsh-session-recall/issues"
+    "url": "https://github.com/gosutry/dsh-seal-scripts/issues"
   }
 }
