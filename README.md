@@ -2,7 +2,20 @@
 
 > 压缩即回顾。压缩一次，留一份回顾；按自然日衰减，需要时能读回来。
 
-版本 `0.3.17` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+版本 `0.4.0` · DSH 插件 · 设计依据见上一层的 `03-记忆插件设计文档.md`。
+
+0.4.0 工具按开关装载，不再五个全挂。设置页标题从「回顾管理」改成「工具(脚本)管理」。
+
+| 组合 | 自创工具（注入清单） | 选项（自动回顾） | 装载的工具 |
+|---|---|---|---|
+| 默认 | 开 | 关 | 3 个：`session_tool_create_read` / `session_tool_create_write` / `session_tool_call` |
+| 全开 | 开 | 开 | 5 个：上面 3 个 + `session_mem_read` / `session_mem_write` |
+| 回顾 | 关 | 开 | 2 个：`session_mem_read` / `session_mem_write` |
+| 全关 | 关 | 关 | 0 个：本插件在这台机器上不提供任何工具 |
+
+理由：两个开关各代表一条路。开「自动回顾」才有回顾可读可写，才需要 mem 两个；开「注入工具组清单」才有工具组这条路，才需要 tool 三个。两个都关时回顾不拆、清单不注入，留着工具也只能空转。
+
+装/卸在运行中生效：`tools.register()` 返回的 disposer 被存下来，每步开头按当前选项对一次账，多了就卸、少了就补，已经对上就什么都不做。`test/tool-gating.test.mjs` 覆盖四种组合与运行中来回切。
 
 0.3.17 改名 `dsh-session-recall` → `dsh-seal-scripts`，「冻结」这个词在英文侧统一成`seal`：
 工具声明两处（`Seal a proven command chain into a toolScript`、`Seal only what repeats`）、
