@@ -16,17 +16,19 @@
 
 ## 目录
 
-- [特性](#特性)
-- [安装](#安装)
-- [快速开始](#快速开始)
-- [脚本固存](#脚本固存重点)
-- [回顾](#回顾上下文记忆)
-- [配置项](#配置项)
-- [设置页](#设置页)
-- [数据位置与备份](#数据位置与备份)
-- [兼容与降级](#兼容与降级)
-- [已知限制](#已知限制)
-- [开发](#开发)
+- [特性](#sec-features)
+- [安装](#sec-install)
+- [快速开始](#sec-quickstart)
+- [脚本固存](#sec-tools)
+- [回顾](#sec-reviews)
+- [配置项](#sec-config)
+- [设置页](#sec-settings)
+- [数据位置与备份](#sec-data)
+- [兼容与降级](#sec-compat)
+- [已知限制](#sec-limits)
+- [开发](#sec-dev)
+<a name="sec-features"></a>
+
 
 ## 特性
 
@@ -50,6 +52,8 @@
 - 零运行时依赖，只用 Node 内置模块；中文 / 英文双语。
 - 宿主能力缺哪块关哪块，不抛错、不整页崩溃。
 - 数据是纯文本：`session-memory/` 拷走即备份。
+<a name="sec-install"></a>
+
 
 ## 安装
 
@@ -71,6 +75,8 @@ dsh plugin --profile web add /path/to/dsh-seal-scripts
 - Node `>=18`（没有原生 zstd 时走内置解码器，不影响功能）
 
 装完重开 DSH，设置里出现 **工具(脚本)管理** 即成功。
+<a name="sec-quickstart"></a>
+
 
 ## 快速开始
 
@@ -90,8 +96,10 @@ dsh plugin --profile web add /path/to/dsh-seal-scripts
 你：跑一下 dsh-plugin-pack，源码目录是 /sdcard/Download/dsh-seal-scripts-0.4.6
 模型：（调用 session_tool_call）exit 0，N 个文件，sha256 与清单一致
 ~~~
+<a name="sec-tools"></a>
 
-## 脚本固存重点
+
+## 脚本固存（重点）
 
 ### 为什么不是一个笔记
 
@@ -186,8 +194,10 @@ $DSH_HOME/session-memory/toolSequence/
 - **导入**：选 zip → 先 `dryRun` 预览「会装哪些 / 会盖哪些 / 跳过哪些」→ 确认才写；同名目录留 `.bak-<时间戳>`。
 - 包内的 `_index.json` 不采信，索引按落地文件重建；`_runs`、备份目录、越界路径、非法 id 一律跳过。
 - 限制：单文件 ≤ 64 MB、合计 ≤ 128 MB，不支持 zip64 与加密包。
+<a name="sec-reviews"></a>
 
-## 回顾上下文记忆
+
+## 回顾（上下文记忆）
 
 回顾解决的问题：上下文被压缩之后，前面的细节原本就没了；现在被压掉的那段原文会被留成一份文件，需要时读回来。
 
@@ -231,6 +241,8 @@ $DSH_HOME/session-memory/toolSequence/
 ### 和脚本固存的关系
 
 一句话：回顾是固存的原料库。跨会话、换机器时，模型靠 `session_tool_create_read` 从回顾里翻出当初的命令与参数，再 `session_tool_create_write` 封存。回顾本身的细节不需要你调——打开「自动回顾」，其余用默认值即可。
+<a name="sec-config"></a>
+
 
 ## 配置项
 
@@ -248,6 +260,8 @@ $DSH_HOME/session-memory/toolSequence/
 | `loadLevel` | `follow` / 0–3 | `follow` | 载入时强制某一级（只改载入，不改已记深度） |
 
 两条联动：自动回顾关着时「回顾注入」读出来一律按关算（存的值不改）；停止降低开启时「载入数值」回退到跟随深度。
+<a name="sec-settings"></a>
+
 
 ## 设置页
 
@@ -259,6 +273,8 @@ $DSH_HOME/session-memory/toolSequence/
 | 会话 | 按工作区分组的会话列表（标题、归档徽章），删除 / 删除并回顾（都二次确认） |
 | 回顾 | 日历区间筛选、回顾列表（深度徽章）、注入预览、删除单条 |
 | 选项 | 四组：工具固存、回顾注入、回顾内容、回顾深度 |
+<a name="sec-data"></a>
+
 
 ## 数据位置与备份
 
@@ -277,6 +293,8 @@ $DSH_HOME/session-memory/
 - 工作区 key 与宿主 `sessions/` 目录同一套编码：`/` 折成 `-`，非 ASCII 写成 `~XXXX`。
 - 备份 = 整个 `session-memory/` 拷走；迁移 = 放到新机器同一位置，装同一个插件。
 - 卸载插件不删数据。
+<a name="sec-compat"></a>
+
 
 ## 兼容与降级
 
@@ -291,6 +309,8 @@ $DSH_HOME/session-memory/
 | `agents.create` / `resume` | 只关「删除活会话 / 删除并回顾」 |
 
 会话日志是多帧 zstd，按帧头逐帧解；没有原生 `zlib.zstdDecompressSync` 时走内置解码器，所以 Node 18 也能读标题。
+<a name="sec-limits"></a>
+
 
 ## 已知限制
 
@@ -299,6 +319,8 @@ $DSH_HOME/session-memory/
 - 回顾只在压缩时产生；「回顾」页只有日历筛选，没有全文搜索。
 - 子代理会话不产生回顾，也不催写日记。
 - 导入导出只针对工具脚本，不搬回顾；回顾靠拷 `session-memory/`。
+<a name="sec-dev"></a>
+
 
 ## 开发
 
