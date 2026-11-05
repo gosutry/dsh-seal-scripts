@@ -1,6 +1,6 @@
 {
   "name": "dsh-seal-scripts",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": false,
   "type": "module",
   "main": "index.js",
@@ -9,7 +9,7 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
-  "description": "DSH 回顾插件：压缩即回顾，按自然日衰减载入，可在设置页管理会话与回顾；选项页可全量加载、切提醒通道、停止降低、强制载入级别；语言跟 DSH 设置走，回顾文件里的中文标记按语言换字显示。",
+  "description": "DSH代码脚本固存，留住模型成功自实现的工作流。",
   "license": "MIT",
   "files": [
     "index.js",
