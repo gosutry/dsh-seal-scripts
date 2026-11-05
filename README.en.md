@@ -16,19 +16,18 @@
 
 ## Contents
 
-- [Features](#sec-features)
-- [Install](#sec-install)
-- [Quick start](#sec-quickstart)
-- [Sealed scripts](#sec-tools)
-- [Reviews](#sec-reviews)
-- [Configuration](#sec-config)
-- [Settings page](#sec-settings)
-- [Data and backup](#sec-data)
-- [Compatibility](#sec-compat)
-- [Known limitations](#sec-limits)
-- [Development](#sec-dev)
+- [Features](#features)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Sealed scripts](#sealed-scripts)
+- [Reviews](#reviews-and-context-memory)
+- [Configuration](#configuration)
+- [Settings page](#settings-page)
+- [Data and backup](#data-and-backup)
+- [Compatibility](#compatibility-and-degradation)
+- [Known limitations](#known-limitations)
+- [Development](#development)
 
-<a id="sec-features" name="sec-features"></a>
 ## Features
 
 **Sealed scripts**
@@ -52,7 +51,6 @@
 - A missing host capability disables that block only — no crash, no blank settings page.
 - Plain-text data: copy `session-memory/` and you have a backup.
 
-<a id="sec-install" name="sec-install"></a>
 ## Install
 
 Add the package in the DSH plugin manager (package name, absolute local path, tarball, or Git URL):
@@ -74,7 +72,6 @@ Requirements:
 
 After the restart, Settings shows **Tool (script) manager**.
 
-<a id="sec-quickstart" name="sec-quickstart"></a>
 ## Quick start
 
 1. **Open the master switch**: Settings → Tool (script) manager → Options → turn on **Auto review**. It is off by default; without it no review is created and cross-session sealing has no raw material.
@@ -94,7 +91,6 @@ You: run dsh-plugin-pack, the source dir is /sdcard/Download/dsh-seal-scripts-0.
 Model: (calls session_tool_call) exit 0, N files, sha256 matches the manifest
 ~~~
 
-<a id="sec-tools" name="sec-tools"></a>
 ## Sealed scripts
 
 ### Why this is not a note
@@ -188,8 +184,7 @@ Changing that mode refreshes every remembered session to the current list — so
 - `_index.json` inside the package is not trusted; the index is rebuilt from the files on disk. `_runs`, backup directories, escaping paths and invalid ids are skipped.
 - Limits: 64 MB per entry, 128 MB total; zip64 and encrypted archives are not supported.
 
-<a id="sec-reviews" name="sec-reviews"></a>
-## Reviews (context memory)
+## Reviews and context memory
 
 The problem reviews solve: after compaction the earlier detail is normally gone. Now the shadowed transcript is kept as a file and can be read back when it matters.
 
@@ -234,7 +229,6 @@ At level 1 or 0 the model sees the diary or the keywords — both written by the
 
 In one line: reviews are the raw-material store for sealing. Across sessions and machines the model uses `session_tool_create_read` to find the original commands and arguments, then `session_tool_create_write` to seal them. You do not need to tune the review side — turn on Auto review and keep the defaults.
 
-<a id="sec-config" name="sec-config"></a>
 ## Configuration
 
 Stored in `$DSH_HOME/session-memory/_options.json`; changes apply immediately and are shared by all workspaces.
@@ -252,7 +246,6 @@ Stored in `$DSH_HOME/session-memory/_options.json`; changes apply immediately an
 
 Two couplings: with Auto review off, the effective `injectEnabled` is always false (the stored value is untouched); with Stop lowering on, Load level falls back to follow.
 
-<a id="sec-settings" name="sec-settings"></a>
 ## Settings page
 
 Settings → **Tool (script) manager**, four tabs:
@@ -264,7 +257,6 @@ Settings → **Tool (script) manager**, four tabs:
 | Reviews | calendar range filter, review list with depth badges, injection preview, delete one review |
 | Options | four groups: Sealed tools, Recall injection, Review content, Review depth |
 
-<a id="sec-data" name="sec-data"></a>
 ## Data and backup
 
 ~~~
@@ -283,7 +275,6 @@ $DSH_HOME/session-memory/
 - Backup: copy the whole `session-memory/`. Migration: put it at the same place on the new machine and install the same plugin.
 - Uninstalling the plugin deletes no data.
 
-<a id="sec-compat" name="sec-compat"></a>
 ## Compatibility and degradation
 
 Missing host capabilities disable the matching block; everything else keeps working (the settings page lists what is missing):
@@ -298,7 +289,6 @@ Missing host capabilities disable the matching block; everything else keeps work
 
 Session logs are multi-frame zstd and are split by frame header before decoding; when `zlib.zstdDecompressSync` is absent the built-in decoder takes over, so Node 18 still reads titles.
 
-<a id="sec-limits" name="sec-limits"></a>
 ## Known limitations
 
 - Tool scripts have **no delete or edit in the UI**: delete by reinstalling (a `.bak-` is kept) or by removing the directory — the registry keeps the entry and later runs report that the directory is missing.
@@ -307,7 +297,6 @@ Session logs are multi-frame zstd and are split by frame header before decoding;
 - Subagent sessions produce no reviews and no diary nudges.
 - Import and export cover tool scripts only, not reviews; copy `session-memory/` for those.
 
-<a id="sec-dev" name="sec-dev"></a>
 ## Development
 
 ~~~
