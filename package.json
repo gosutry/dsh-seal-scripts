@@ -1,6 +1,6 @@
 {
   "name": "dsh-seal-scripts",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "private": false,
   "type": "module",
   "main": "index.js",
@@ -9,7 +9,7 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
-  "description": "DSH代码脚本固存，留住模型成功自实现的工作流。",
+  "description": "Seal proven command chains into reusable executable tool scripts for DSH agents. DSH 代码脚本固存，留住模型成功自实现的工作流。",
   "license": "MIT",
   "files": [
     "index.js",
