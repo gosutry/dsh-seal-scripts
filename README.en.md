@@ -4,7 +4,7 @@
 
 > Seal the scripts that worked. Keep what compaction threw away.
 
-[![version](https://img.shields.io/badge/version-0.4.9-4a7cff)](https://github.com/gosutry/dsh-seal-scripts)
+[![version](https://img.shields.io/npm/v/dsh-seal-scripts?color=4a7cff)](https://www.npmjs.com/package/dsh-seal-scripts)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D18-339933)](https://nodejs.org)
 [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C1.0.0-6f42c1)](https://github.com/deepseek-ai/dsh)
