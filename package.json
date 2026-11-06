@@ -1,6 +1,6 @@
 {
   "name": "dsh-seal-scripts",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "private": false,
   "type": "module",
   "main": "index.js",
@@ -44,12 +44,23 @@
     }
   },
   "keywords": [
+    "ai",
+    "ai-agents",
+    "llm",
+    "agent",
+    "cli",
+    "plugin",
+    "nodejs",
+    "npm",
+    "automation",
+    "workflow",
+    "tools",
+    "memory",
+    "context",
     "dsh",
     "dsh-plugin",
-    "memory",
-    "compaction",
-    "recall",
-    "deepseek-harness"
+    "deepseek-harness",
+    "deepseek"
   ],
   "repository": {
     "type": "git",
