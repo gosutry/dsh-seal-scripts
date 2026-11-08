@@ -116,13 +116,13 @@ $DSH_HOME/session-memory/toolSequence/
         <script>            the file that actually runs (.sh / .js .mjs .cjs / .ps1 / .bat .cmd)
         README.md           generated from the manifest at install time, for humans
         <notes>.md          read-only notes: pitfalls, paths, benchmarks (never executed)
-    _runs/                  full logs of output that exceeded the cap
+    _runs/                  full stdout/stderr log of every run (not only when over a cap)
     <id>.bak-<timestamp>/   previous directory kept on reinstall or import
 ~~~
 
 ### How the model learns about it
 
-The end of the system prompt gains a toolSequence block: at most 24 entries, and the whole block (header + guide + entries) is capped at 1600 characters, one line each — `· id (title): purpose｜entry <entry>｜args <p1> <p2>`. After sealing you never have to remind the model that the tool exists.
+The end of the system prompt gains a toolSequence block: every sealed toolScript is listed (0.4.11 removed the entry and character caps), one line each — `· id (title): purpose｜entry <entry>｜args <p1> <p2>`. The purpose is shown in full. After sealing you never have to remind the model that the tool exists.
 
 When that list refreshes (option **When the list is refreshed**):
 
@@ -152,10 +152,10 @@ Changing that mode refreshes every remembered session to the current list — so
 | `id` | starts with a lowercase letter, 2–41 chars, only `a-z0-9-` |
 | file name | starts alphanumeric, no leading dot, no path separators, up to 61 chars |
 | `run` vs extension | bash→`.sh`; node→`.js/.mjs/.cjs`; ps1→`.ps1`; cmd→`.bat/.cmd` |
-| size | one script ≤ 64 KB; one tool script (scripts + docs) ≤ 512 KB |
-| `title` / `purpose` | non-empty; purpose ≤ 600 bytes (it enters the prompt; display truncates at 80 chars) |
+| size | no cap (0.4.11 removed the 64 KB and 512 KB limits) |
+| `title` / `purpose` | non-empty; any length, shown in full in the prompt |
 | `entry` / `steps` | must name files in `scripts`; entry defaults to the first script |
-| `timeoutMs` | 1000–600000, default 120000 |
+| `timeoutMs` | any positive ms, clamped at run time to the host maxTimeoutMs |
 | docs | must be `.md`, may not be called `README.md`, no duplicates |
 | script body | non-empty; must not contain `<!--ovr:` (it would break review markers) |
 | same id exists | refused without `replace`; the error quotes the first 12 hex chars of the manifest sha256 |
@@ -170,8 +170,8 @@ Changing that mode refreshes every remembered session to the current list — so
 | argv | interpreter arguments + absolute script path + your args, passed as an array, never through a shell |
 | cwd | `workspace` (session workspace), `toolScript` (the script directory), or an absolute path inside either |
 | environment | inherits `process.env`, plus `TOOL_NAME`, `TOOL_SCRIPT`, `TOOL_ROOT`, `DSH_HOME` |
-| timeout | 120 s by default, 600 s maximum; SIGTERM → 2 s → SIGKILL; process group on POSIX, `taskkill /T /F` on Windows |
-| output | 64 KB default, 1 MB maximum, stdout and stderr share the budget; overflow goes in full to `_runs/` and the reply carries the head plus the file path |
+| timeout | follows the DSH terminal settings (120 s default, capped by DSH maxTimeoutMs); on expiry the process is NOT killed, it moves to the background and the reply carries pid and the log path; explicit stop: SIGTERM → 2 s → SIGKILL; process group on POSIX, `taskkill /T /F` on Windows |
+| output | defaults to DSH maxOutputBytes, no extra 1 MB ceiling; stdout/stderr go straight into `_runs/` and the reply carries the head plus the file path, and overflow is never dropped |
 | result | `{ exitCode, signal, timedOut, stdout, stderr, truncated, spill }`; success is not judged for the caller |
 | argument count | more arguments than `params` declares fails before running (they would shift); fewer is fine |
 | drift | sha256 is compared first; mismatch refuses, `allowDrift: true` allows it and marks the result |
@@ -179,7 +179,7 @@ Changing that mode refreshes every remembered session to the current list — so
 
 ### Import / export
 
-- **Export**: Sealed tools tab → Export. Packs `toolSequence.zip` (store, no compression) straight into the current session workspace and returns the real path — no browser download. Over 24 MB is refused.
+- **Export**: Sealed tools tab → Export. Packs `toolSequence.zip` (store, no compression) straight into the current session workspace and returns the real path — no browser download. No size limit since 0.4.11: entries are streamed to disk, so memory does not grow with the toolset.
 - **Import**: pick a zip → `dryRun` preview of what will be installed, overwritten and skipped → confirm to write. An existing directory is kept as `.bak-<timestamp>`.
 - `_index.json` inside the package is not trusted; the index is rebuilt from the files on disk. `_runs`, backup directories, escaping paths and invalid ids are skipped.
 - Limits: 64 MB per entry, 128 MB total; zip64 and encrypted archives are not supported.

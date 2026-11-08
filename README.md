@@ -127,13 +127,13 @@ $DSH_HOME/session-memory/toolSequence/
         <脚本>              真正执行的文件（.sh / .js .mjs .cjs / .ps1 / .bat .cmd）
         README.md           安装时按清单自动生成，给人看
         <说明>.md           只读说明：坑、路径、速度基准（不会被执行）
-    _runs/                  输出超限时的全量日志
+    _runs/                  每次执行的 stdout/stderr 全量日志（不是只在超限时才写）
     <id>.bak-<时间戳>/      覆盖安装 / 导入时保留的旧目录
 ~~~
 
 ### 模型怎么知道有这个工具
 
-系统提示词末尾会多一段「工具组」：条目最多 24 条，整段（标题 + 引导句 + 条目）上限 1600 字符，每条一行——`id（标题）：用途 ｜ 入口 ｜ 参数`。所以封存之后不需要你提醒它有这个工具。
+系统提示词末尾会多一段「工具组」：装了几个就列几个（0.4.11 起没有条数与字数上限），每条一行——`id（标题）：用途 ｜ 入口 ｜ 参数`，purpose 原样全文显示。所以封存之后不需要你提醒它有这个工具。
 
 清单什么时候换新（选项「清单词刷新时刻」）：
 
@@ -154,19 +154,19 @@ $DSH_HOME/session-memory/toolSequence/
 
 - 不带参数调用 `session_tool_call`：列全部工具脚本名单。
 - `dryRun: true`：只回显参数与 cwd，不执行。
-- `calls: []`：最多 20 条顺序执行，逐条报退出码、耗时、stdout、stderr。
+- `calls: []`：按给的顺序全跑（0.4.11 起不再限 20 条），逐条报退出码、耗时、stdout、stderr。
 
 ### 封存时的校验
 
 | 项 | 规则 |
 |---|---|
-| `id` | 小写字母开头，2–41 位，只允许 `a-z0-9-` |
-| 文件名 | 首字符字母数字，不许点开头、不许路径分隔符，最长 61 |
+| `id` | 小写字母开头（0.4.11 起不限长度），只允许 `a-z0-9-` |
+| 文件名 | 首字符字母数字，只许字母数字与 . _ -，不许路径、不许点开头，不限长度 |
 | `run` 与扩展名 | bash→`.sh`；node→`.js/.mjs/.cjs`；ps1→`.ps1`；cmd→`.bat/.cmd` |
-| 体积 | 单脚本 ≤ 64 KB；一个工具脚本（脚本+说明）≤ 512 KB |
-| `title` / `purpose` | 非空；purpose ≤ 600 字节（它进系统提示词，展示时超 80 字符截断） |
+| 体积 | 不设上限（0.4.11 删掉了 64 KB / 512 KB 两个死数） |
+| `title` / `purpose` | 非空；purpose 不限字数，进系统提示词时全文显示 |
 | `entry` / `steps` | 必须是 `scripts` 里的文件；entry 缺省取第一个脚本 |
-| `timeoutMs` | 1000–600000，默认 120000 |
+| `timeoutMs` | 正数即可（毫秒）；运行时只夹到 DSH 的 maxTimeoutMs，默认取 DSH 的 timeoutMs |
 | 说明文件 | 必须 `.md`，不许叫 `README.md`，不许重名 |
 | 脚本正文 | 不许空；不许出现 `<!--ovr:`（会破坏回顾分区） |
 | 同名已存在 | 无 `replace` 直接拒绝，并给出清单 sha256 前 12 位 |
@@ -181,19 +181,19 @@ $DSH_HOME/session-memory/toolSequence/
 | argv | 解释器参数 + 脚本绝对路径 + 你的 args，数组传递，不经过 shell |
 | cwd | `workspace`（会话工作区）、`toolScript`（脚本目录），或落在两者之内的绝对路径 |
 | 环境变量 | 继承 `process.env`，另加 `TOOL_NAME`、`TOOL_SCRIPT`、`TOOL_ROOT`、`DSH_HOME` |
-| 超时 | 默认 120 s，上限 600 s；SIGTERM → 2 s → SIGKILL；POSIX 杀进程组，Windows 走 `taskkill /T /F` |
-| 输出 | 默认 64 KB、上限 1 MB，stdout 与 stderr 共用额度；超限时全量写进 `_runs/`，返回值给前一段加文件路径 |
-| 返回值 | `{ exitCode, signal, timedOut, stdout, stderr, truncated, spill }`，不替调用方判成败 |
+| 超时 | 跟随 DSH 终端设置（默认 120 s，天花板是 DSH 的 maxTimeoutMs）；到点不杀进程，转后台继续跑并返回 pid 与日志路径；显式停机仍是 SIGTERM → 2 s → SIGKILL；POSIX 杀进程组，Windows 走 `taskkill /T /F` |
+| 输出 | 默认取 DSH 的 maxOutputBytes，不再另设 1 MB 封顶；每次执行都写进 `_runs/`，返回值给前一段加文件路径，超限也不丢内容 |
+| 返回值 | `{ exitCode, signal, timedOut, background, pid, logFile, stdout, stderr, truncated, spill }`，不替调用方判成败 |
 | 参数个数 | 实参多于 `params` 声明的数量 → 开跑前失败（会错位）；少传合法 |
 | 漂移 | 跑前比对清单 sha256，不一致拒绝；`allowDrift: true` 放行并在结果里标 `drift` |
 | 越界 | 只跑工具脚本目录内的文件；清单里没有的脚本名直接拒绝 |
 
 ### 导入 / 导出
 
-- **导出**：自创工具页 → 导出。打成 `toolSequence.zip`（store，不压缩），直接写进当前会话的工作区目录并回真实路径，不走浏览器下载；超过 24 MB 直接拒绝。
+- **导出**：自创工具页 → 导出。打成 `toolSequence.zip`（store，不压缩），直接写进当前会话的工作区目录并回真实路径，不走浏览器下载；0.4.11 起不限大小，边读边写盘（内存占用与工具组大小无关）。
 - **导入**：选 zip → 先 `dryRun` 预览「会装哪些 / 会盖哪些 / 跳过哪些」→ 确认才写；同名目录留 `.bak-<时间戳>`。
 - 包内的 `_index.json` 不采信，索引按落地文件重建；`_runs`、备份目录、越界路径、非法 id 一律跳过。
-- 限制：单文件 ≤ 64 MB、合计 ≤ 128 MB，不支持 zip64 与加密包。
+- 大小：不设死上限。0.4.11 起导入先把请求体流式落盘、再逐条解进 staging（不吃内存），解压炸弹按「解压后总字节 + 16 MB 余量 vs 磁盘可用空间」判——装不下才拒绝。不支持 zip64 与加密包。
 <a name="sec-reviews"></a>
 
 
