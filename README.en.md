@@ -143,7 +143,7 @@ Changing that mode refreshes every remembered session to the current list — so
 
 - Calling `session_tool_call` without arguments lists every tool script.
 - `dryRun: true` echoes the arguments and cwd without running.
-- `calls: []` runs up to 20 entries in order, reporting exit code, duration, stdout and stderr per entry.
+- `calls: []` runs the entries in order (no 20-entry cap since 0.4.11), reporting exit code, duration, stdout and stderr per entry.
 
 ### Validation when sealing
 
@@ -224,6 +224,19 @@ At level 1 or 0 the model sees the diary or the keywords — both written by the
 - Reviews enter the context every turn, oldest first.
 - The preview box on the Reviews tab runs the same assembly function as the real injection: what you see is what that turn receives (selecting one review shows only that one).
 - If assembly fails (a review too large) it does not silently become no reviews; the model gets a diagnostic: how many, total size, the largest file, what to do.
+
+### The two review tools
+
+With Auto review on, the plugin installs two more tools; with the switch off they do not appear.
+
+| Tool | Purpose | Key arguments |
+|---|---|---|
+| `session_mem_read` | find a review from one clue: this workspace → children → (with permission) siblings and parents; one hit per call | `need` (required, the user's own words), `skip` (files already read), `allowOuter` (search sibling and parent workspaces) |
+| `session_mem_write` | read one review's original dialogue; write keywords and diary, many at once | `file` or `date`+`nth`; `keywords`, `diary`; batch with `writes[]` |
+
+- Locator only, no content = that review's Original section: dialogue only, tool calls (▸/◂ and their output) stripped.
+- Writing many uses `writes[]`: all-or-nothing — one bad entry and the batch is not written.
+- Neither tool changes depth: only a read that hits this workspace's own review raises it one level and pins it.
 
 ### How it relates to sealing
 
