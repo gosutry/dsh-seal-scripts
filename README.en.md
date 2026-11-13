@@ -184,6 +184,17 @@ Changing that mode refreshes every remembered session to the current list — so
 - `_index.json` inside the package is not trusted; the index is rebuilt from the files on disk. `_runs`, backup directories, escaping paths and invalid ids are skipped.
 - Limits: 64 MB per entry, 128 MB total; zip64 and encrypted archives are not supported.
 
+### Clear cache (0.5.1)
+
+The **Clear cache** button sits at the right end of the import / export row. It takes two clicks (the first only turns the button into "Confirm clear" and spells out what will go).
+
+- **Deleted**: every `<id>.bak-<timestamp>` rollback version (the old directory kept by a reinstall or an import), and every run log in `_runs/`.
+- **Kept**: `_index.json` and every `<id>/` toolScript directory — tools keep running and the index is not rebuilt. Those two live outside the index, which is exactly why the rest is safe to drop.
+- Only directories named "valid id + `.bak-` + digits" count as rollback versions; anything else is left alone (better to under-delete).
+- If an import is in flight, the package it staged inside `_runs/` is skipped and the receipt says how many were skipped.
+- One entry that cannot be removed (in use or no permission) does not abort the run: the rest still go, and the receipt says "N could not be removed".
+- The receipt reports how many rollback versions, how many run logs, and how many bytes were cleared.
+
 ## Reviews and context memory
 
 The problem reviews solve: after compaction the earlier detail is normally gone. Now the shadowed transcript is kept as a file and can be read back when it matters.
@@ -265,7 +276,7 @@ Settings → **Tool (script) manager**, four tabs:
 
 | Tab | Contents |
 |---|---|
-| Sealed tools (shown as `toolList` in the English UI) | tool path, the prompt text about to be injected, "Inject toolSequence list" toggle and refresh mode, import / export |
+| Sealed tools (shown as `toolList` in the English UI) | tool path, the prompt text about to be injected, "Inject toolSequence list" toggle and refresh mode, import / export / clear cache |
 | Sessions | sessions grouped by workspace (title, archived badge), Delete / Delete + review, both confirmed |
 | Reviews | calendar range filter, review list with depth badges, injection preview, delete one review |
 | Options | four groups: Sealed tools, Recall injection, Review content, Review depth |
