@@ -47,7 +47,7 @@
 
 **Engineering**
 
-- Zero runtime dependencies, Node built-ins only. Chinese and English UI.
+- Zero runtime dependencies, Node built-ins only. The UI and injected text follow DSH's 8 languages (中文 / English / 日本語 / Español / Français / Deutsch / Русский / Português); model-facing errors and receipts are in English.
 - A missing host capability disables that block only — no crash, no blank settings page.
 - Plain-text data: copy `session-memory/` and you have a backup.
 
@@ -277,6 +277,8 @@ Settings → **Tool (script) manager**, four tabs:
 | Tab | Contents |
 |---|---|
 | Sealed tools (shown as `toolList` in the English UI) | tool path, the prompt text about to be injected, "Inject toolSequence list" toggle and refresh mode, import / export / clear cache |
+
+The UI language follows DSH only: every settings-page string, the review injection (preamble / heading / placeholders / body line markers), the diary reminder, and the toolSequence section all switch with it. A review file is written with the header and section titles of the language active **at capture time**; switching later only changes the display, never the file (all 8 spellings are accepted when reading). Errors and receipts the tools return to the model are English — they do not follow the UI language.
 | Sessions | sessions grouped by workspace (title, archived badge), Delete / Delete + review, both confirmed |
 | Reviews | calendar range filter, review list with depth badges, injection preview, delete one review |
 | Options | four groups: Sealed tools, Recall injection, Review content, Review depth |
