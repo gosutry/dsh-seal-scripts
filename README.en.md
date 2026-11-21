@@ -20,6 +20,7 @@
 - [Install](#sec-install)
 - [Quick start](#sec-quickstart)
 - [Sealed scripts](#sec-tools)
+- [Session management](#sec-sessions)
 - [Reviews](#sec-reviews)
 - [Configuration and settings page](#sec-config)
 - [Data and backup](#sec-data)
@@ -189,6 +190,40 @@ Two clicks (the first only changes the button label):
 - **Kept**: `_index.json` and every `<id>/` directory.
 - Only "valid id + `.bak-` + digits" directories count; a staged import package is skipped.
 - One entry that cannot be removed does not abort the run; the receipt reports counts and bytes.
+
+<a name="sec-sessions"></a>
+
+## Session management
+
+The Sessions tab lists this machine's sessions grouped by workspace and manages each one: import a package, delete it, or delete it after producing a review.
+
+#### The list
+
+- **Grouped by workspace**: one block per workspace that has sessions, headed by the workspace path; empty workspaces take no space.
+- **One row each**: the session title (the id in grey while a title does not exist yet), with an **Archived** badge when the session is archived.
+- **Unreadable logs are named**: when a log cannot be decoded the list says so at the top instead of showing it as an empty session.
+
+#### Import
+
+- **One button**: the leftmost **Import** in the footer takes a `dsh-session-<id>.zip`; no hand-built directories. When the host cannot write zstd the button is disabled and says why.
+- **Preview first**: the dry run says whether the id will be renamed and whether it hangs under that session as a branch; nothing is written until you confirm.
+- **Openable immediately**: the log is packed the way DSH stores it (a one-line header frame plus a body frame) and then `attachSession` registers it; images and files land under the attachment store by sha256; the host is told the list gained a session, so the main window shows it at once, with no restart.
+- **Collisions are not forced**: an id that already exists anywhere on this machine gets a new id and the original stays untouched; a same-workspace collision also hangs under that session as a branch (`parentSession`), another workspace gets a plain rename. A session that carries inherited history (`isSeeded:true`) records its real inherited count and still opens and branches.
+- **Backed up first**: the workspace roster and projection cache are copied into `会话导入备份-<time>/` inside the target workspace before writing.
+
+#### Delete
+
+- **Two taps**: the first tap only turns the button into Confirm; the second deletes.
+- **Live sessions are closed first**: cancel → wait idle → flush → release the write handle, then remove the directory; if it cannot be closed, the delete is refused and the log is kept.
+- **Removed from the list**: the directory is deleted and the session is detached from its workspace, so it leaves the list at once.
+- **Leftovers are reported**: when the engine still holds a reference, the receipt says so ("it may be remembered until restart") instead of pretending it is clean.
+
+#### Delete + review
+
+- **Review first, then delete**: compact, wait for the review to be split out, validate, and only then delete.
+- **No delete on failure**: any failing step keeps the session; the worst case is "compaction succeeded, split failed, session still there", and that compaction is irreversible.
+- **Log**: each failing step writes a line to `session-memory/_compact-delete.log`, otherwise only one English error remains.
+- **Result**: the review it produces shows up on the Reviews tab and decays by calendar day.
 
 <a name="sec-reviews"></a>
 
