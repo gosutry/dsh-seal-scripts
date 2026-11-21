@@ -1,6 +1,6 @@
 {
   "name": "dsh-seal-scripts",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": false,
   "type": "module",
   "main": "index.js",
@@ -16,10 +16,11 @@
     "cordis.patch.yml",
     "lib",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "README.en.md"
   ],
   "peerDependencies": {
-    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <1.0.0"
+    "@deepseek-ai/dsh": ">=0.2.2-rc.1 <1.0.0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh": {

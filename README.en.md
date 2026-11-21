@@ -7,326 +7,344 @@
 [![version](https://img.shields.io/npm/v/dsh-seal-scripts?color=4a7cff)](https://www.npmjs.com/package/dsh-seal-scripts)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D18-339933)](https://nodejs.org)
-[![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.1--rc.2%20%3C1.0.0-6f42c1)](https://github.com/deepseek-ai/dsh)
+[![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.2--rc.1%20%3C1.0.0-6f42c1)](https://github.com/deepseek-ai/dsh)
 [![deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)](./package.json)
 
-**Sealed scripts are the point of this plugin.** A command chain that just worked is sealed on the spot into an executable tool script: a directory, a manifest, one line in the system prompt. Next time it runs with a single sentence — no re-deriving commands, no rewriting the script, no asking you to repeat yourself.
+**Sealed scripts**: a chain that just worked is sealed into a tool script — a directory, a manifest entry, one line in the system prompt; next time it runs with a single sentence.
 
-**Reviews are the base layer.** When DSH compacts the context, the shadowed transcript is written to disk as a review file, decays by calendar day, and is injected into context; when details matter, the model reads the original back from a clue. Reviews are also the raw material for sealing a workflow from an earlier session.
+**Reviews**: when DSH compacts the context, the shadowed transcript is written to a review file, decays by calendar day and is injected back; the model can read the original from a clue. Reviews are also the raw material for sealing across sessions.
 
 ## Contents
 
-- [Features](#features)
-- [Install](#install)
-- [Quick start](#quick-start)
-- [Sealed scripts](#sealed-scripts)
-- [Reviews](#reviews-and-context-memory)
-- [Configuration](#configuration)
-- [Settings page](#settings-page)
-- [Data and backup](#data-and-backup)
-- [Compatibility](#compatibility-and-degradation)
-- [Known limitations](#known-limitations)
-- [Development](#development)
+- [Features](#sec-features)
+- [Install](#sec-install)
+- [Quick start](#sec-quickstart)
+- [Sealed scripts](#sec-tools)
+- [Reviews](#sec-reviews)
+- [Configuration and settings page](#sec-config)
+- [Data and backup](#sec-data)
+- [Compatibility and degradation](#sec-compat)
+- [Known limitations](#sec-limits)
+- [Development](#sec-dev)
+
+<a name="sec-features"></a>
 
 ## Features
 
-**Sealed scripts**
+#### Sealed scripts
 
-- **One working chain → one tool script**: full script text, entry, args, steps, provenance and a per-file sha256, written in one go.
-- **Present in the system prompt**: the tool list sits at the end of the prompt every turn (up to 24 entries), so the model knows what it can run.
-- **Runs as written**: arguments travel as an argv array and never pass through a shell; the interpreter comes from the run field (bash / node / powershell / cmd).
-- **Verifiable**: per-file sha256 is compared before running; a hand-edited script is refused unless you explicitly allow it.
-- **Portable**: the whole set packs into a store-only zip; import previews before writing and rebuilds the index from the files on disk.
+- **One chain → one tool script**: full script text, entry, args, steps, provenance, per-file sha256.
+- **In the system prompt**: the toolSequence block lists every sealed tool, one line each.
+- **Runs as written**: args as an argv array, never through a shell; interpreter chosen by the run field.
+- **Verifiable**: sha256 compared before running; a hand-edited script is refused unless explicitly allowed.
+- **Portable**: store-only zip; import previews first, index rebuilt from the files on disk.
 
-**Context reviews**
+#### Context reviews
 
-- **Written on compaction**: pure code, no model call; tool calls and their arguments are kept verbatim.
-- **Four-level decay**: today original → next-day summary → diary → keyword index; reading it bumps one level and pins it.
-- **Cross-workspace search**: this workspace → children → siblings → parents; outer rings need explicit permission.
-- **Diary nudges**: while keywords or the diary are still empty the model is asked to finish them in one call; the nudge disappears once they are written.
+- **Captured on compaction**: no model call; tool calls and arguments kept verbatim.
+- **Four-level decay**: original → summary → diary → keywords; a read bumps and pins the level.
+- **Cross-workspace search**: workspace → children → siblings → parents; outer rings need permission.
+- **Diary nudges**: asked once when the diary or keywords are empty.
 
-**Engineering**
+#### Engineering
 
-- Zero runtime dependencies, Node built-ins only. The UI and injected text follow DSH's 8 languages (中文 / English / 日本語 / Español / Français / Deutsch / Русский / Português); model-facing errors and receipts are in English.
-- A missing host capability disables that block only — no crash, no blank settings page.
-- Plain-text data: copy `session-memory/` and you have a backup.
+- Zero runtime dependencies, Node built-ins only; UI and injected text follow DSH's 8 languages, model-facing errors and receipts are English.
+- A missing host capability disables that block only.
+- Plain-text data: copy `session-memory/` for a backup.
+
+<a name="sec-install"></a>
 
 ## Install
 
-Add the package in the DSH plugin manager (package name, absolute local path, tarball, or Git URL):
+Add the package in the plugin manager (package name, local path, tarball, or Git URL). `--profile` is required, e.g. `web`:
 
 ~~~bash
-# --profile is required (otherwise: required option "--profile" not specified)
 dsh plugin --profile web add dsh-seal-scripts
-
-# local directory: pnpm records it as a link dependency in that profile
 dsh plugin --profile web add /path/to/dsh-seal-scripts
 ~~~
 
-Or use Settings → Plugins → Add with a package name, absolute path, tarball, or Git URL. Restart the profile after installing.
+The second line is a local directory, registered as a link dependency. Restart the profile to load it.
 
-Requirements:
-
-- host `@deepseek-ai/dsh` `>=0.2.1-rc.2`, `<1.0.0` (peer dependency, not forced)
-- Node `>=18` (without native zstd the built-in decoder takes over; functionality is unchanged)
+Requirements: host `@deepseek-ai/dsh` `>=0.2.2-rc.1`, `<1.0.0` (peer, not forced); Node `>=18`.
 
 After the restart, Settings shows **Tool (script) manager**.
 
+<a name="sec-quickstart"></a>
+
 ## Quick start
 
-1. **Open the master switch**: Settings → Tool (script) manager → Options → turn on **Auto review**. It is off by default; without it no review is created and cross-session sealing has no raw material.
-2. **Run a chain end to end**: scrape a page, transcode, pack, connect over SSH — anything that really worked and that you will need again.
+1. **Master switch**: Settings → Tool (script) manager → Options → turn on **Auto review** (off by default; nothing is created while off).
+2. **Run a chain end to end**.
 3. **Seal it**: ask the model to turn the steps above into a tool.
-4. **Reuse it**: ask it to run `<id>`; add show me the commands first, do not run to preview.
-
-A sample session (output is illustrative):
+4. **Reuse it**: "run <id>"; add "show me the commands first, do not run" to preview.
 
 ~~~text
 You: turn that packaging flow into a tool
-Model: (calls session_tool_create_write) installed tool script dsh-plugin-pack at .../toolSequence/dsh-plugin-pack
-       entry pack.sh, params source_dir out_dir; it enters the system prompt on the next assembly.
+Model: (session_tool_create_write) installed dsh-plugin-pack at .../toolSequence/dsh-plugin-pack
+       entry pack.sh, params source_dir out_dir
 
 (new session)
-You: run dsh-plugin-pack, the source dir is /sdcard/Download/dsh-seal-scripts-0.4.6
-Model: (calls session_tool_call) exit 0, N files, sha256 matches the manifest
+You: run dsh-plugin-pack, the source dir is /sdcard/Download/my-src
+Model: (session_tool_call) exit 0, N files, sha256 matches the manifest
 ~~~
+
+<a name="sec-tools"></a>
 
 ## Sealed scripts
 
-### Why this is not a note
+#### Why this is not a note
 
-Models are good at writing markdown about a method, and the note cannot run. They are also good at rebuilding commands on the spot, slightly differently each time. The artifact here is the script itself: the lines that worked, stored byte for byte, argument order included.
+A note cannot run, and rebuilding commands on the spot differs every time. What gets stored is the script itself: the lines that worked, byte for byte, argument order included.
 
-### How to trigger it
+#### How to trigger it
 
 | What you say | What happens | When to use |
 |---|---|---|
 | turn the steps above into a tool | seals the steps that just ran | same session, commands still in context |
-| turn the workflow from an earlier session into a tool | reads review originals first with `session_tool_create_read` (every tool call and its arguments), then seals | new session, new machine, old history |
+| turn the workflow from an earlier session into a tool | reads review originals first with `session_tool_create_read`, then seals | new session, new machine, old history |
 
-The chain must have worked. What gets stored is the version that ran, not a draft — editing after installing means re-sending the whole context.
+The version that ran is stored, not a draft; editing after installing means re-sending the context.
 
-### What gets created
+#### What gets created
 
 ~~~
 $DSH_HOME/session-memory/toolSequence/
     _index.json             registry: id, title, purpose, entry, args, steps, per-file sha256
     <id>/
-        toolScript.json     manifest: full script text, docs, hashes, provenance (review file + line)
+        toolScript.json     manifest: full script text, docs, hashes, provenance
         <script>            the file that actually runs (.sh / .js .mjs .cjs / .ps1 / .bat .cmd)
-        README.md           generated from the manifest at install time, for humans
-        <notes>.md          read-only notes: pitfalls, paths, benchmarks (never executed)
-    _runs/                  full stdout/stderr log of every run (not only when over a cap)
+        README.md           generated from the manifest
+        <notes>.md          read-only notes (never executed)
+    _runs/                  full stdout/stderr log of every run
     <id>.bak-<timestamp>/   previous directory kept on reinstall or import
 ~~~
 
-### How the model learns about it
+#### How the model learns about it
 
-The end of the system prompt gains a toolSequence block: every sealed toolScript is listed (0.4.11 removed the entry and character caps), one line each — `· id (title): purpose｜entry <entry>｜args <p1> <p2>`. The purpose is shown in full. After sealing you never have to remind the model that the tool exists.
-
-When that list refreshes (option **When the list is refreshed**):
+The system prompt gains a toolSequence block, one line each: `· id (title): purpose｜entry <entry>｜args <p1> <p2>`. No entry or character cap; purpose shown in full.
 
 | Mode | Behaviour | Cost |
 |---|---|---|
-| Before a new session (default) | computed once at the first assembly, then fixed until the session ends | installing or removing a tool mid-session leaves the prompt unchanged |
-| Live per session | computed every turn | one cache miss on the next message (the whole session is resent) |
+| Before a new session (default) | computed at the first assembly, fixed until the session ends | installing or removing a tool mid-session leaves the prompt unchanged |
+| Live per session | computed every turn | one cache miss on the next message |
 
-Changing that mode refreshes every remembered session to the current list — so there is a defined way out of the current session does not see the new tool case.
+Changing the mode refreshes every remembered session immediately.
 
-### The three tools
+#### The three tools
 
 | Tool | Purpose | Key arguments |
 |---|---|---|
 | `session_tool_create_write` | seal a chain | `toolScript{ id, title, purpose, entry, scripts[], docs[], params, steps, timeoutMs }`; `replace` overwrites |
-| `session_tool_create_read` | read review originals (tool calls and results included), read-only | `file` or `date`+`nth`; `mode` = outline / raw / block; `cursor`, `chars` paging; `line`, `span` for one call |
+| `session_tool_create_read` | read review originals, read-only | `file` or `date`+`nth`; `mode` = outline / raw / block; `cursor`, `chars`, `line`, `span` |
 | `session_tool_call` | run as written | `toolScript`, `step`, `args`, `stdin`, `cwd`, `dryRun`, `calls`, `stopOnError`, `allowDrift`, `timeoutMs`, `maxOutputBytes` |
 
-- Calling `session_tool_call` without arguments lists every tool script.
-- `dryRun: true` echoes the arguments and cwd without running.
-- `calls: []` runs the entries in order (no 20-entry cap since 0.4.11), reporting exit code, duration, stdout and stderr per entry.
+- No arguments: lists every tool script.
+- `dryRun: true`: echoes the arguments and cwd only.
+- `calls: []`: runs in order, no count limit, reporting exit code, duration and logs per entry.
 
-### Validation when sealing
+#### Validation when sealing
 
 | Item | Rule |
 |---|---|
-| `id` | starts with a lowercase letter, 2–41 chars, only `a-z0-9-` |
-| file name | starts alphanumeric, no leading dot, no path separators, up to 61 chars |
+| `id` | starts with a lowercase letter, only `a-z0-9-`, no length limit |
+| file name | starts alphanumeric, letters, digits and . _ - only, no paths, no leading dot |
 | `run` vs extension | bash→`.sh`; node→`.js/.mjs/.cjs`; ps1→`.ps1`; cmd→`.bat/.cmd` |
-| size | no cap (0.4.11 removed the 64 KB and 512 KB limits) |
-| `title` / `purpose` | non-empty; any length, shown in full in the prompt |
-| `entry` / `steps` | must name files in `scripts`; entry defaults to the first script |
-| `timeoutMs` | any positive ms, clamped at run time to the host maxTimeoutMs |
-| docs | must be `.md`, may not be called `README.md`, no duplicates |
-| script body | non-empty; must not contain `<!--ovr:` (it would break review markers) |
+| size | no cap |
+| `title` / `purpose` | non-empty; any length |
+| `entry` / `steps` | must name files in `scripts`; entry defaults to the first |
+| `timeoutMs` | any positive ms, clamped to the host maxTimeoutMs, defaults to the host timeoutMs |
+| docs | must be `.md`, not `README.md`, no duplicates |
+| script body | non-empty; must not contain `<!--ovr:` |
 | same id exists | refused without `replace`; the error quotes the first 12 hex chars of the manifest sha256 |
 
-`steps` only declares pipeline order and never runs anything by itself; `params` only declares argv order and names are not validated.
+`steps` only declares order and never chains; `params` only declares argv order and names are not validated.
 
-### Execution semantics
+#### Execution semantics
 
 | Item | Value |
 |---|---|
-| interpreter | bash→`bash` from PATH; node→current `process.execPath`; ps1→Windows PowerShell (or `pwsh` elsewhere); cmd→`%ComSpec% /d /c` (falls back to `sh` off Windows) |
-| argv | interpreter arguments + absolute script path + your args, passed as an array, never through a shell |
-| cwd | `workspace` (session workspace), `toolScript` (the script directory), or an absolute path inside either |
+| interpreter | bash; node uses `process.execPath`; ps1 uses Windows PowerShell (`pwsh` elsewhere); cmd uses `%ComSpec% /d /c` (falls back to `sh` off Windows) |
+| argv | interpreter args + absolute script path + args, as an array, never through a shell |
+| cwd | `workspace`, `toolScript`, or an absolute path inside either |
 | environment | inherits `process.env`, plus `TOOL_NAME`, `TOOL_SCRIPT`, `TOOL_ROOT`, `DSH_HOME` |
-| timeout | follows the DSH terminal settings (120 s default, capped by DSH maxTimeoutMs); on expiry the process is NOT killed, it moves to the background and the reply carries pid and the log path; explicit stop: SIGTERM → 2 s → SIGKILL; process group on POSIX, `taskkill /T /F` on Windows |
-| output | defaults to DSH maxOutputBytes, no extra 1 MB ceiling; stdout/stderr go straight into `_runs/` and the reply carries the head plus the file path, and overflow is never dropped |
-| result | `{ exitCode, signal, timedOut, stdout, stderr, truncated, spill }`; success is not judged for the caller |
-| argument count | more arguments than `params` declares fails before running (they would shift); fewer is fine |
-| drift | sha256 is compared first; mismatch refuses, `allowDrift: true` allows it and marks the result |
-| containment | only files inside the tool script directory run; a script name missing from the manifest is refused |
+| timeout | follows the DSH terminal settings (120 s default, capped by maxTimeoutMs); on expiry it moves to the background and the reply carries pid and the log path; explicit stop: SIGTERM → 2 s → SIGKILL; process group on POSIX, `taskkill /T /F` on Windows |
+| output | DSH maxOutputBytes; every run written to `_runs/` and the reply carries the file path |
+| result | `{ exitCode, signal, timedOut, background, pid, logFile, stdout, stderr, truncated, spill }` |
+| argument count | more than `params` declares fails before running; fewer is fine |
+| drift | sha256 compared first; mismatch refuses, `allowDrift: true` allows it and marks `drift` |
+| containment | only files inside the script directory run; unknown script names refused |
 
-### Import / export
+#### Import / export
 
-- **Export**: Sealed tools tab → Export. Packs `toolSequence.zip` (store, no compression) straight into the current session workspace and returns the real path — no browser download. No size limit since 0.4.11: entries are streamed to disk, so memory does not grow with the toolset.
-- **Import**: pick a zip → `dryRun` preview of what will be installed, overwritten and skipped → confirm to write. An existing directory is kept as `.bak-<timestamp>`.
-- `_index.json` inside the package is not trusted; the index is rebuilt from the files on disk. `_runs`, backup directories, escaping paths and invalid ids are skipped.
-- Limits: 64 MB per entry, 128 MB total; zip64 and encrypted archives are not supported.
+- **Export**: Sealed tools tab → Export. Packs `toolSequence.zip` (store) into the session workspace and returns the path — no browser download.
+- **Import**: pick a zip → `dryRun` preview → confirm to write; an existing directory is kept as `.bak-<timestamp>`.
+- `_index.json` in the package is not trusted; the index is rebuilt from disk. `_runs`, backups, escaping paths and invalid ids are skipped.
+- No size cap; the zip-bomb guard compares extracted bytes + 16 MB against free disk space. zip64 and encrypted archives are not supported.
 
-### Clear cache (0.5.1)
+#### Clear cache
 
-The **Clear cache** button sits at the right end of the import / export row. It takes two clicks (the first only turns the button into "Confirm clear" and spells out what will go).
+Two clicks (the first only changes the button label):
 
-- **Deleted**: every `<id>.bak-<timestamp>` rollback version (the old directory kept by a reinstall or an import), and every run log in `_runs/`.
-- **Kept**: `_index.json` and every `<id>/` toolScript directory — tools keep running and the index is not rebuilt. Those two live outside the index, which is exactly why the rest is safe to drop.
-- Only directories named "valid id + `.bak-` + digits" count as rollback versions; anything else is left alone (better to under-delete).
-- If an import is in flight, the package it staged inside `_runs/` is skipped and the receipt says how many were skipped.
-- One entry that cannot be removed (in use or no permission) does not abort the run: the rest still go, and the receipt says "N could not be removed".
-- The receipt reports how many rollback versions, how many run logs, and how many bytes were cleared.
+- **Deleted**: `<id>.bak-<timestamp>` rollback directories, every log in `_runs/`.
+- **Kept**: `_index.json` and every `<id>/` directory.
+- Only "valid id + `.bak-` + digits" directories count; a staged import package is skipped.
+- One entry that cannot be removed does not abort the run; the receipt reports counts and bytes.
+
+<a name="sec-reviews"></a>
 
 ## Reviews and context memory
 
-The problem reviews solve: after compaction the earlier detail is normally gone. Now the shadowed transcript is kept as a file and can be read back when it matters.
+The shadowed transcript is kept as a file and can be read back when it matters.
 
-### When a review is created
+#### When a review is created
 
-- Only on **compaction**: when DSH compacts, the shadowed events are written as one review file (summary + original + an empty diary section).
-- Tool calls and their arguments are kept verbatim, never truncated — once the log is gone, this copy is the only original.
+- Only on **compaction**: written as one review file (summary + original + empty diary).
+- Tool calls and arguments are kept verbatim, never truncated.
 - Spawned subagent sessions produce nothing; with Auto review off, not even detection happens.
-- Delete + review in the Sessions tab triggers one on purpose: compact, wait for the review to land, confirm a new one appeared, and only then delete. Any failed step aborts the deletion.
+- Delete + review triggers one on purpose: compact → confirm the review landed → delete. Any failed step aborts.
+- Compaction runs through the host command registry: the service is mounted per agent preset and isolated, so the plugin root never calls it — `/compact` is executed by the command handler.
+- Once compaction ends, the plugin reads the newest `compaction/summary` and splits the review.
+- Every failed step is logged to `session-memory/_compact-delete.log` (trimmed to its last 64 KB past 256 KB).
 
-### Four levels
+#### Four levels
 
 | Day | Level | What the model sees |
 |---|---|---|
-| the day of compaction | 3 | the original dialogue (tool calls and errors filtered out) |
+| the day of compaction | 3 | the original dialogue (tool calls and errors filtered) |
 | day 2 | 2 | the compaction summary |
-| days 3–28 | 1 | the diary (written by the model) |
-| day 29 and later | 0 | keywords plus the file name, as an index |
+| days 3–28 | 1 | the diary |
+| day 29 and later | 0 | keywords plus the file name |
 
-Days are local calendar days; the hour does not matter. When you point out a misremembered detail, the model reads the original back; only reading the workspace own copy bumps and pins the level (0→1, 1→2), and a pinned review stops decaying. Reviews of child, sibling and parent workspaces are read-only and do not change levels.
+Local calendar days. Only reading this workspace's own review bumps and pins the level (0→1, 1→2) and stops decay; child, sibling and parent reviews are read-only.
 
-### Cross-workspace search
+#### Cross-workspace search
 
-The unit is a workspace review folder, not a filesystem walk. Order: this workspace → its children (deepest first) → siblings (deepest first) → the parent → the parent siblings → their level-1, level-2 children, and so on. Outer rings are only read when `allowOuter` is true; otherwise the count is reported.
+The unit is a workspace review folder. Order: this workspace → children → siblings → the parent → the parent's siblings → their level-1 and level-2 children. Outer rings need `allowOuter`.
 
-Granularity: keywords first, then summary, then original; the block that matches is returned whole. Within a workspace, hits sort by level, then matched terms, then compaction time.
+Hits go keywords first, then summary, then original; within a workspace they sort by level, matched terms, then compaction time.
 
-### Diary nudges
+#### Diary nudges
 
-At level 1 or 0 the model sees the diary or the keywords — both written by the model itself. While either is empty it is asked to finish, in one of two places:
+At level 1 or 0, an empty diary or empty keywords trigger one nudge:
 
-- **In context** (default): appended to the review text in the same message; once written the text changes, the message is replaced and the nudge disappears.
-- **In the system prompt**: supplied as a trailing prompt section. Compliance differs between the two; pick the one that works for you.
+- **In context** (default): appended to the review text, disappears once written.
+- **In the system prompt**: a trailing prompt section.
 
-### Injection and preview
+#### Injection and preview
 
 - Reviews enter the context every turn, oldest first.
-- The preview box on the Reviews tab runs the same assembly function as the real injection: what you see is what that turn receives (selecting one review shows only that one).
-- If assembly fails (a review too large) it does not silently become no reviews; the model gets a diagnostic: how many, total size, the largest file, what to do.
+- The preview box runs the same assembly function as the real injection (selecting one review shows only that one).
+- A failed assembly gives the model a diagnostic (how many, total size, largest file) instead of silently showing no reviews.
 
-### The two review tools
+#### The two review tools
 
-With Auto review on, the plugin installs two more tools; with the switch off they do not appear.
+Installed only while Auto review is on.
 
 | Tool | Purpose | Key arguments |
 |---|---|---|
-| `session_mem_read` | find a review from one clue: this workspace → children → (with permission) siblings and parents; one hit per call | `need` (required, the user's own words), `skip` (files already read), `allowOuter` (search sibling and parent workspaces) |
-| `session_mem_write` | read one review's original dialogue; write keywords and diary, many at once | `file` or `date`+`nth`; `keywords`, `diary`; batch with `writes[]` |
+| `session_mem_read` | find a review from a clue, one hit per call | `need` (required), `skip`, `allowOuter` |
+| `session_mem_write` | read one original; write keywords and diary, in batch | `file` or `date`+`nth`; `keywords`, `diary`; `writes[]` |
 
-- Locator only, no content = that review's Original section: dialogue only, tool calls (▸/◂ and their output) stripped.
-- Writing many uses `writes[]`: all-or-nothing — one bad entry and the batch is not written.
-- Neither tool changes depth: only a read that hits this workspace's own review raises it one level and pins it.
+- Locator only = the Original section: dialogue only, tool calls stripped.
+- Writing many uses `writes[]`; all-or-nothing.
+- Neither tool changes depth.
 
-### How it relates to sealing
+#### How it relates to sealing
 
-In one line: reviews are the raw-material store for sealing. Across sessions and machines the model uses `session_tool_create_read` to find the original commands and arguments, then `session_tool_create_write` to seal them. You do not need to tune the review side — turn on Auto review and keep the defaults.
+Reviews are the raw-material store: the model uses `session_tool_create_read` to recover commands and arguments, then `session_tool_create_write` to seal them.
 
-## Configuration
+<a name="sec-config"></a>
 
-Stored in `$DSH_HOME/session-memory/_options.json`; changes apply immediately and are shared by all workspaces.
+## Configuration and settings page
+
+There is one config file, `$DSH_HOME/session-memory/_options.json`; changes apply immediately and are shared by all workspaces. Settings → **Tool (script) manager** → **Options** edits the same file.
+
+#### The four tabs
+
+| Tab | Contents |
+|---|---|
+| Sealed tools (`toolList` in the English UI) | tool path, the injected prompt text, list toggle and refresh mode, import / export / clear cache |
+| Sessions | sessions grouped by workspace; Delete, Delete + review (both confirmed) |
+| Reviews | calendar filter, review list with depth badges, injection preview, delete one |
+| Options | four groups: Sealed tools, Recall injection, Review content, Review depth |
+
+#### Every option field
 
 | Field | Values | Default | Meaning |
 |---|---|---|---|
 | `autoReviewEnabled` | bool | `false` | master switch: no reviews, no injection, no review tools when off |
-| `injectEnabled` | bool | `true` | recall injection and diary nudges (does not cover the tool list) |
+| `injectEnabled` | bool | `true` | recall injection and diary nudges (not the tool list) |
 | `toolListEnabled` | bool | `true` | inject the toolSequence block and install/remove the three `session_tool_*` tools |
 | `toolListRefresh` | `newSession` / `realtime` | `newSession` | when the list is recomputed |
-| `fullLoad` | bool | `false` | keep tool calls and errors at level 3 (warned: full re-injection after every compaction) |
-| `reminderChannel` | `context` / `system` | `context` | diary nudge inside the review text or as a prompt section |
-| `stopLowering` | bool | `false` | every review keeps its recorded level; no daily decay |
-| `loadLevel` | `follow` / 0–3 | `follow` | force a level at load time (does not change the recorded depth) |
+| `fullLoad` | bool | `false` | keep tool calls and errors at level 3 (full re-injection) |
+| `reminderChannel` | `context` / `system` | `context` | where the diary nudge goes |
+| `stopLowering` | bool | `false` | reviews keep their recorded level, no daily decay |
+| `loadLevel` | `follow` / 0–3 | `follow` | force a level at load time (recorded depth unchanged) |
 
-Two couplings: with Auto review off, the effective `injectEnabled` is always false (the stored value is untouched); with Stop lowering on, Load level falls back to follow.
+Two couplings: with Auto review off, `injectEnabled` reads as off (the stored value is untouched); with Stop lowering on, Load level falls back to follow.
 
-## Settings page
+#### UI language
 
-Settings → **Tool (script) manager**, four tabs:
+Follows DSH: settings strings, injected review text, diary reminders and the toolSequence block all switch. A review file is written with the header and section titles of the language active **at capture time**; switching later only changes the display (all 8 spellings are accepted). Errors and receipts the tools return to the model are English.
 
-| Tab | Contents |
-|---|---|
-| Sealed tools (shown as `toolList` in the English UI) | tool path, the prompt text about to be injected, "Inject toolSequence list" toggle and refresh mode, import / export / clear cache |
-
-The UI language follows DSH only: every settings-page string, the review injection (preamble / heading / placeholders / body line markers), the diary reminder, and the toolSequence section all switch with it. A review file is written with the header and section titles of the language active **at capture time**; switching later only changes the display, never the file (all 8 spellings are accepted when reading). Errors and receipts the tools return to the model are English — they do not follow the UI language.
-| Sessions | sessions grouped by workspace (title, archived badge), Delete / Delete + review, both confirmed |
-| Reviews | calendar range filter, review list with depth badges, injection preview, delete one review |
-| Options | four groups: Sealed tools, Recall injection, Review content, Review depth |
+<a name="sec-data"></a>
 
 ## Data and backup
 
 ~~~
 $DSH_HOME/session-memory/
     _options.json                 options
-    _locale.json                  language (zh / en)
+    _locale.json                  language
     _health.json                  last success/failure per workspace
+    _compact-delete.log           per-step diagnostics (trimmed past 256 KB)
     <workspace key>/
-        <stamp>-<id>.md           review text (the single source of truth, plain text, readable and searchable)
-        <same name>.json          load cache for that review (rebuilt from file time if lost)
-        _assembly.json.migrated-*  leftover of the old single-file index (never auto-deleted)
-    toolSequence/                 tool scripts (machine level, shared by all workspaces)
+        <stamp>-<id>.md           review text (plain text, readable and searchable)
+        <same name>.json          load cache (rebuilt from file time if lost)
+        _assembly.json.migrated-*  leftover of the old index (never auto-deleted)
+    toolSequence/                 tool scripts (machine level, shared)
 ~~~
 
-- The workspace key uses the same encoding as the host `sessions/` folders: `/` becomes `-`, non-ASCII becomes `~XXXX`.
+- The workspace key uses the host `sessions/` encoding: `/` becomes `-`, non-ASCII becomes `~XXXX`.
 - Backup: copy the whole `session-memory/`. Migration: put it at the same place on the new machine and install the same plugin.
-- Uninstalling the plugin deletes no data.
+- Uninstalling deletes no data.
+
+<a name="sec-compat"></a>
 
 ## Compatibility and degradation
 
-Missing host capabilities disable the matching block; everything else keeps working (the settings page lists what is missing):
+Missing host capabilities disable the matching block only (the settings page lists what is missing):
 
 | Missing | Effect |
 |---|---|
 | `systemPrompt.context` | recall injection off |
 | `systemPrompt.section` | diary nudge section and toolSequence block do not appear |
 | `tools.register` | none of the five tools is installed |
-| `webServer.register` | the settings endpoints are not installed |
-| `agents.create` / `resume` | only Delete live session / Delete + review are off |
+| `webServer.register` | settings endpoints not installed |
+| `agents.create` / `resume` | deleting a live session falls back to tier 2 (plugin-built teardown) |
+| `commands.execute`, or `command-compact` not mounted | Delete + review is unavailable; plain delete still works |
 
-Session logs are multi-frame zstd and are split by frame header before decoding; when `zlib.zstdDecompressSync` is absent the built-in decoder takes over, so Node 18 still reads titles.
+Two tiers for deleting a live session: (1) the `dispose` returned by `agents.create` / `resume`, captured by the lifecycle hook; (2) no handle — the plugin builds its own `cancel({kind:'disposed'})` → `whenIdle()` → `scope.dispose()`. Tier 2 only stops the agent; unregistering belongs to the host closure with no public API, so the delete succeeds with a `warnings` entry (the settings page says the engine may still remember it until restart).
+
+Session logs are multi-frame zstd, split by frame header; without native `zlib.zstdDecompressSync` the built-in decoder takes over.
+
+<a name="sec-limits"></a>
 
 ## Known limitations
 
-- Tool scripts have **no delete or edit in the UI**: delete by reinstalling (a `.bak-` is kept) or by removing the directory — the registry keeps the entry and later runs report that the directory is missing.
-- `steps` do not chain automatically; use `calls` for a sequence.
-- Reviews are created on compaction only; the Reviews tab has a calendar filter and no full-text search.
+- Tool scripts have **no delete or edit in the UI**: reinstall to overwrite (a `.bak-` is kept) or remove the directory (the registry keeps the entry and later runs report a missing directory).
+- `steps` never chain automatically; use `calls`.
+- Reviews are created on compaction only; the Reviews tab has no full-text search.
 - Subagent sessions produce no reviews and no diary nudges.
-- Import and export cover tool scripts only, not reviews; copy `session-memory/` for those.
+- Import and export cover tool scripts only; copy `session-memory/` for reviews.
+- Delete + review needs `command-compact` mounted on that session's preset.
+- With the plugin-built teardown, the engine may still remember the session until it restarts.
+
+<a name="sec-dev"></a>
 
 ## Development
 
 ~~~
-index.js            plugin entry (exports name / apply / inject only)
+index.js            plugin entry (exports name / apply / inject)
 cordis.patch.yml    inserts the plugin into the host loader
 lib/core/           host-side logic: storage, decay, tool definitions, script runner
 lib/host/           host service adapters: 12 HTTP endpoints, capability probe, session delete
@@ -334,8 +352,8 @@ lib/client.js       settings page (React, registered at settings.section)
 ~~~
 
 - Zero runtime dependencies, ESM, Node `>=18`.
-- Tests: `node --test test/*.test.mjs` (the test directory is not part of the published package).
-- Packaging: `npm pack`; the publish whitelist is the `files` field of `package.json`.
+- Tests `node --test test/*.test.mjs` (not shipped in the package).
+- Packaging `npm pack`; whitelist is the `files` field of `package.json`.
 
 ## License
 
