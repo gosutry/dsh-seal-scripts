@@ -2,7 +2,7 @@
 
 **简体中文** | [English](./README.en.md)
 
-> 把跑通的脚本封存成工具，把被压缩的对话留成回顾。
+> 把跑通的 CLI 命令链，固化成带契约、可重放的工具脚本，以实际会话历史调用为原料。
 
 [![version](https://img.shields.io/npm/v/dsh-seal-scripts?color=4a7cff)](https://www.npmjs.com/package/dsh-seal-scripts)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
@@ -10,48 +10,51 @@
 [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.2--rc.1%20%3C1.0.0-6f42c1)](https://github.com/deepseek-ai/dsh)
 [![deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen)](./package.json)
 
-**脚本固存**：一次跑通的命令链当场固化成工具脚本，落成目录、写进清单、进系统提示词，下一句就能重跑。
-
-**回顾**：DSH 压缩上下文时，被压掉的原文落盘成回顾文件，按自然日衰减后注入，需要细节时模型能读回原文。回顾也是跨会话固存的原料来源。
-
 ## 目录
 
-- [特性](#sec-features)
+- [CLI 固化](#sec-class)
 - [安装](#sec-install)
 - [快速开始](#sec-quickstart)
 - [脚本固存](#sec-tools)
-- [会话管理](#sec-sessions)
 - [回顾](#sec-reviews)
+- [会话管理](#sec-sessions)
 - [配置与设置页](#sec-config)
 - [数据位置与备份](#sec-data)
 - [兼容与降级](#sec-compat)
 - [已知限制](#sec-limits)
 - [开发](#sec-dev)
 
-<a name="sec-features"></a>
+<a name="sec-class"></a>
 
-## 特性
+## CLI 固化
 
-#### 脚本固存
+命令装在机器上，但**怎么调用每次由模型现编**；编对了也只对这一次。固化 = 把编对的那次连同契约存成可反复调用的工具：
 
-- **一条链 → 一个工具脚本**：脚本全文、入口、参数、步骤、出处、每文件 sha256。
-- **进系统提示词**：工具组清单每轮列出，装几个列几个。
-- **按原状执行**：参数走 argv 数组、不经 shell；解释器按 run 字段选。
-- **可核对**：跑前比对 sha256，手改过的脚本拒绝，除非显式放行。
-- **可搬运**：整组打 zip（store），导入先预览，索引按落地文件重建。
+| 固化对象 | 落点 | 重放效果 |
+|---|---|---|
+| 命令正文 | `scripts[].content` + 每文件 sha256 | 逐字节重放；手改过跑前就拒 |
+| 参数契约 | `params`（argv 顺序）+ 个数校验 | 多传开跑前失败；少传合法 |
+| 解释器 | `run` 字段（bash / node / ps1 / cmd） | 不靠模型猜环境 |
+| 工作目录 | `cwd`：`workspace` / `toolScript` / 两者内绝对路径 | 不会忘 `cd`；越界路径拒绝 |
+| 运行边界 | `timeoutMs`、输出上限、超时转后台 | 长命令不拖死对话，日志进 `_runs/` |
+| 出处 | `provenance`、`toolScript.json` 的 hashes | 知道封自哪次对话，改过能查出来 |
 
-#### 上下文回顾
+四步：
 
-- **压缩即留档**：零模型调用，工具调用与参数原样保留。
-- **四级衰减**：原文 → 摘要 → 日记 → 关键词；被读取时加一级并锁定。
-- **按工作区扩面搜索**：本工作区 → 子级 → 平级 → 上级，外圈要许可。
-- **补写提醒**：日记或关键词空着时催一次。
+```text
+① 跑通     模型照常用 CLI 把事做成（ffmpeg / gh / git / 自写脚本都行）
+② 封存     session_tool_create_write  →  toolSequence/<id>/ 目录 + 清单 + sha256
+③ 进提示词  工具组清单列在系统提示词末尾：id（标题）：用途 | 入口 | 参数
+④ 重放     session_tool_call{toolScript:"<id>", args:[...]}  →  按原状执行、报退出码
+```
 
-#### 工程面
+和现场敲命令的差别：
 
-- 零运行时依赖，只用 Node 内置模块；界面与注入跟随 DSH 的 8 种语言，模型侧报错与回执用英文。
-- 宿主能力缺哪块关哪块。
-- 数据是纯文本，`session-memory/` 拷走即备份。
+- 脚本文本有 sha256 兜底，手改拒跑（`allowDrift` 放行）。
+- argv 数组不经 shell；参数多于声明个数开跑前失败。
+- 解释器与 cwd 固定；只跑脚本目录内的文件，清单外脚本名拒绝。
+- 非零退出码直接报错，不伪装成功。
+- 工具组清单常驻系统提示词；整组 zip 可搬运，导入先预览。
 
 <a name="sec-install"></a>
 
@@ -59,12 +62,22 @@
 
 插件管理器添加本包（包名、本地路径、tarball、Git 均可）。`--profile` 必填，如 `web`：
 
-~~~bash
-dsh plugin --profile web add dsh-seal-scripts
-dsh plugin --profile web add /path/to/dsh-seal-scripts
-~~~
+```bash
+dsh plugin --profile web add dsh-seal-scripts          # 从 registry 装最新版
+dsh plugin --profile web add dsh-seal-scripts@0.6.1    # 钉版本
+dsh plugin --profile web add /path/to/dsh-seal-scripts # 本地目录，注册为 link 依赖
+```
 
-第二行是本地目录，注册为 link 依赖。装完重开 profile 才加载。
+`dsh plugin` 把参数原样转给 profile 目录里的 pnpm，所以也可以直接走 npm 那一套：
+
+```bash
+npm i dsh-seal-scripts            # 装进当前 Node 环境
+npx dsh plugin --profile web add dsh-seal-scripts
+```
+
+单用 `npm i` 只把包放进 `node_modules`，不登记进 profile；还要上面那条（或插件管理器）按包名注册一次。
+
+装完重开 profile 才加载。
 
 要求：宿主 `@deepseek-ai/dsh` `>=0.2.2-rc.1`、`<1.0.0`（peer，不强制）；Node `>=18`。
 
@@ -74,12 +87,12 @@ dsh plugin --profile web add /path/to/dsh-seal-scripts
 
 ## 快速开始
 
-1. **打开总闸**：设置 → 工具(脚本)管理 → 选项 → 打开「自动回顾」（默认关，关着不产生回顾）。
-2. **跑通一套命令**。
-3. **封存**：对模型说「将上述流程总结成工具」。
-4. **复用**：「跑一下 <id>」；想先看命令加一句「先看看命令别执行」。
+1. 设置 → 工具(脚本)管理 → 选项 → 打开「自动回顾」（默认关）。
+2. 跑通一套命令。
+3. 说「将上述流程总结成工具」，模型调 `session_tool_create_write` 封存。
+4. 说「跑一下 <id>」复用；想先看命令加「先看看命令别执行」（`dryRun`）。
 
-~~~text
+```text
 你：把刚才这套打包流程存成工具
 模型：（session_tool_create_write）已装好 dsh-plugin-pack，目录 …/toolSequence/dsh-plugin-pack
      入口 pack.sh，参数 source_dir out_dir
@@ -87,15 +100,11 @@ dsh plugin --profile web add /path/to/dsh-seal-scripts
 （新会话）
 你：跑一下 dsh-plugin-pack，源码目录 /sdcard/Download/my-src
 模型：（session_tool_call）exit 0，N 个文件，sha256 与清单一致
-~~~
+```
 
 <a name="sec-tools"></a>
 
 ## 脚本固存
-
-#### 为什么不是笔记
-
-笔记不能执行，现场重拼命令每次都不一样。这里存的是脚本本身：当初跑通的那几行，逐字节保存，参数顺序固定。
 
 #### 怎么触发
 
@@ -104,11 +113,11 @@ dsh plugin --profile web add /path/to/dsh-seal-scripts
 | 将上述流程总结成工具 | 把刚跑通的步骤固化成脚本 | 同会话，命令还在上下文里 |
 | 将之前会话的流程总结成工具 | 先用 `session_tool_create_read` 读回顾原文，再固化 | 换会话、换机器、翻旧账 |
 
-存的是跑通的那一份，不是草稿；装完再改要重发整段上下文。
+存的是跑通的那一份，不是草稿；装完再改要重发整段上下文（或显式 `replace`）。
 
-#### 产物长什么样
+#### 产物
 
-~~~
+```text
 $DSH_HOME/session-memory/toolSequence/
     _index.json             名单：id、标题、用途、入口、参数、步骤、每文件 sha256
     <id>/
@@ -118,9 +127,9 @@ $DSH_HOME/session-memory/toolSequence/
         <说明>.md           只读说明（不执行）
     _runs/                  每次执行的 stdout/stderr 全量日志
     <id>.bak-<时间戳>/      覆盖安装 / 导入保留的旧目录
-~~~
+```
 
-#### 模型怎么知道有这个工具
+#### 注入系统提示词
 
 系统提示词末尾多一段「工具组」，每条一行：`id（标题）：用途 ｜ 入口 ｜ 参数`。无条数与字数上限，purpose 全文。
 
@@ -140,7 +149,7 @@ $DSH_HOME/session-memory/toolSequence/
 | `session_tool_call` | 按原状执行 | `toolScript`、`step`、`args`、`stdin`、`cwd`、`dryRun`、`calls`、`stopOnError`、`allowDrift`、`timeoutMs`、`maxOutputBytes` |
 
 - 不带参数：列全部工具脚本。
-- `dryRun: true`：只回显参数与 cwd。
+- `dryRun: true`：只回显参数与 cwd，不执行。
 - `calls: []`：按序全跑，不限条数，逐条报退出码、耗时、日志。
 
 #### 封存时的校验
@@ -191,54 +200,18 @@ $DSH_HOME/session-memory/toolSequence/
 - 只认「合法 id + `.bak-` + 纯数字」的目录；进行中的导入临时包跳过。
 - 单项删不掉不中断整轮，回执报数量与字节。
 
-<a name="sec-sessions"></a>
-
-## 会话管理
-
-会话页按工作区分组列出本机会话，一条一条管：整包导入、删除、删除并回顾。列表读的是落盘日志，不用打开会话也能看。
-
-#### 列表
-
-- **按工作区分组**：每个有会话的工作区一段，段头是工作区路径；空工作区不占位置。
-- **每条一行**：会话标题（还没有标题时用 id 占位、灰色显示），归档的会话带「已归档」徽章。
-- **读不出来就说**：日志解不开时列表顶上一句说明，不把读不出的会话显示成「空会话」。
-
-#### 导入
-
-- **一个按键**：页脚最左边「导入」，选 `dsh-session-<id>.zip` 即可，不用手搓目录；宿主写不了 zstd 时这个按钮直接禁用并说明原因。
-- **先看后装**：选包先预演（会不会换新 id、要不要挂分支），确认才落盘。
-- **写完就能开**：日志按 DSH 的格式压成「首帧户口本 + 正文帧」，再 `attachSession` 登记；图与文件按 sha256 落到附件库；落盘后通知宿主列表新增，主界面左侧立刻出现，不用重启。
-- **撞号不硬来**：同 id 撞上本机任何已有会话就换新 id，原来那条一个字节都不动；同工作区的撞号还会挂成原会话的分支（`parentSession`），别的工作区只换号。带继承历史的会话（`isSeeded:true`）按包内实际条数记，照样能开、能挂分支。
-- **写盘前先备份**：`workspace.json` 与目录册备份到目标工作区的 `会话导入备份-<时间>/`。
-
-#### 删除
-
-- **二次确认**：第一次点只把按钮变成「确认」，再点才真删。
-- **活的先关**：会话还在内存里时先 cancel → 等闲 → flush → 释放句柄，再删目录；关不掉就拒绝，日志原样保留。
-- **删完摘牌**：目录删掉后从工作区里摘掉，列表里同时消失。
-- **残留会说**：引擎里还留着引用时，回执会明说「重启前可能还记着它」，不假装干净。
-
-#### 删除并回顾
-
-- **先留档再删**：先压缩出回顾、等拆出、校验通过，才删会话。
-- **失败不删**：任何一步失败都不删，最坏情况是「压缩成功、拆失败、会话还在」；这一步不可逆。
-- **日志**：每一步失败都写一行到 `session-memory/_compact-delete.log`，不然只剩一句英文报错。
-- **产物**：生成的回顾出现在「回顾」页，按自然日衰减。
-
 <a name="sec-reviews"></a>
 
-## 回顾（上下文记忆）
+## 回顾
 
-被压掉的那段原文留成文件，需要时读回来。
+回顾是固化的原料：会话被压缩时，**工具调用与参数原样落盘**，模型之后能按线索读回原文，再用 `session_tool_create_write` 把当初那条链封成工具。没有它，固化只能发生在同一会话里。
 
 #### 什么时候产生
 
-- 只有**压缩**才产生：落盘成回顾（摘要 + 原文 + 空日记区）。
-- 工具调用与参数原样保留、不截断。
+- 只有**压缩**才产生：摘要 + 原文 + 空日记区；工具调用与参数原样保留、不截断。
 - 子代理会话不产生；「自动回顾」关着连检测都不做。
-- 「删除并回顾」主动触发：压缩 → 确认回顾落地 → 删会话；任一步失败不删。
-- 压缩走宿主命令表：压缩服务按会话预设隔离，插件根上下文看不见它，`/compact` 由命令处理器执行。
-- 压缩结束后取最新 `compaction/summary` 拆成回顾。
+- 「删除并回顾」主动触发：压缩 → 确认回顾落地 → 删会话。
+- 压缩走宿主命令表（`/compact` 由命令处理器执行），结束后取最新 `compaction/summary` 拆成回顾。
 - 每步失败写一行到 `session-memory/_compact-delete.log`（>256 KB 留最后 64 KB）。
 
 #### 四级深度
@@ -252,23 +225,20 @@ $DSH_HOME/session-memory/toolSequence/
 
 按本地日历日算。只有**本工作区自己那份**被读出去才加一级并锁定（0→1、1→2），锁定后不再衰减；子级、平级、上级只读、不计深度。
 
-#### 按工作区扩面搜索
+#### 扩面搜索
 
-单位是工作区的回顾文件夹。顺序：本工作区 → 子级 → 平级 → 上一级 → 上一级的平级 → 再往下的 1、2 层子。外圈要 `allowOuter`。
+顺序：本工作区 → 子级 → 平级 → 上一级 → 上一级的平级 → 再往下的 1、2 层子。外圈要 `allowOuter`。
 
 命中先关键词、再摘要、最后原文；同工作区内按层级、命中词数、压缩时刻排序。
 
 #### 补写提醒
 
-深度降到 1 或 0 时，日记或关键词空着就催一次：
-
-- **在上下文提醒**（默认）：并进回顾正文，写完自动消失。
-- **在系统侧提醒**：作为系统提示词末尾的一段。
+深度降到 1 或 0 时，日记或关键词空着就催一次：默认并进回顾正文（写完自动消失），也可改为系统提示词末尾的一段。
 
 #### 注入与预览
 
 - 回顾每轮自动进上下文，从旧到新。
-- 设置页预览框与真实注入走同一装配函数（选中某条时只看那条）。
+- 设置页预览与真实注入走同一装配函数（选中某条时只看那条）。
 - 装配失败给模型一段诊断（几份、多大、最大那份是谁），不会变成「没有回顾」。
 
 #### 两个回顾工具
@@ -284,9 +254,38 @@ $DSH_HOME/session-memory/toolSequence/
 - 写多份用 `writes[]`：全部合格才落盘。
 - 深度不由这两个工具改。
 
-#### 和脚本固存的关系
+<a name="sec-sessions"></a>
 
-回顾是固存的原料库：跨会话时模型用 `session_tool_create_read` 翻出命令与参数，再 `session_tool_create_write` 封存。
+## 会话管理
+
+会话页按工作区分组列出本机会话，列表读的是落盘日志，不用打开会话也能看。
+
+#### 列表
+
+- 每段开头是工作区路径；空工作区不占位置。
+- 每条一行：标题（还没有标题时用 id 占位、灰色显示），归档的带「已归档」徽章。
+- 日志解不开时列表顶上一句说明，不把读不出的会话显示成「空会话」。
+
+#### 导入
+
+- 页脚最左边「导入」，选 `dsh-session-<id>.zip`；宿主写不了 zstd 时按钮禁用并说明原因。
+- 先预演（会不会换新 id、要不要挂分支），确认才落盘。
+- 日志压成「首帧户口本 + 正文帧」后 `attachSession` 登记；图与文件按 sha256 落附件库；落盘后通知宿主列表新增，不用重启。
+- 同 id 撞上已有会话就换新 id，原来那条一个字节都不动；同工作区的撞号挂成原会话分支（`parentSession`）。
+- 写盘前把 `workspace.json` 与目录册备份到目标工作区 `会话导入备份-<时间>/`。
+
+#### 删除
+
+- 二次确认。
+- 会话还在内存里时先 cancel → 等闲 → flush → 释放句柄，再删目录；关不掉就拒绝，日志原样保留。
+- 删完从工作区摘牌，列表里同时消失。
+- 引擎里还留着引用时，回执明说「重启前可能还记着它」。
+
+#### 删除并回顾
+
+- 先压缩出回顾、等拆出、校验通过，才删会话；任一步失败都不删。
+- 每步失败写一行到 `session-memory/_compact-delete.log`。
+- 生成的回顾出现在「回顾」页，按自然日衰减。
 
 <a name="sec-config"></a>
 
@@ -326,7 +325,7 @@ $DSH_HOME/session-memory/toolSequence/
 
 ## 数据位置与备份
 
-~~~
+```text
 $DSH_HOME/session-memory/
     _options.json                 选项
     _locale.json                  语言
@@ -337,7 +336,7 @@ $DSH_HOME/session-memory/
         <同名>.json               载入缓存（丢了按文件时间重建）
         _assembly.json.migrated-*  旧版索引迁移遗留（不自动删）
     toolSequence/                 工具脚本（机器级，所有工作区共用）
-~~~
+```
 
 - 工作区 key 与宿主 `sessions/` 同套编码：`/` 折成 `-`，非 ASCII 写成 `~XXXX`。
 - 备份 = 拷走整个 `session-memory/`；迁移 = 放到新机器同一位置，装同一插件。
@@ -360,7 +359,7 @@ $DSH_HOME/session-memory/
 
 删除活会话两档：① `agents.create` / `resume` 返回的 `dispose`，由生命周期捕获；② 无句柄时自造 `cancel({kind:'disposed'})` → `whenIdle()` → `scope.dispose()`。第 2 档只能停住 agent，摘注册表是宿主闭包动作、无公开接口，所以删除成功但带 `warnings`（设置页显示「已删除（引擎重启前可能还记着它）」）。
 
-会话日志是多帧 zstd，按帧头逐帧解；无原生 `zlib.zstdDecompressSync` 时用内置解码器。
+会话日志是多帧 zstd，按帧头逐帧解；无原生 `zlib.zstdDecompressSync` 时用内置解码器。导入会话需要宿主能写 zstd：`zstdCompress` 不存在时「导入」按钮变灰并说明原因。
 
 <a name="sec-limits"></a>
 
@@ -370,21 +369,22 @@ $DSH_HOME/session-memory/
 - `steps` 不自动串跑，连跑用 `calls`。
 - 回顾只在压缩时产生；回顾页只有日历筛选，无全文搜索。
 - 子代理会话不产生回顾，不催日记。
-- 导入导出只管工具脚本，回顾靠拷 `session-memory/`。
+- 导入导出只管工具脚本，回顾靠拷 `session-memory/`；会话包是另一套导入（会话页）。
 - 「删除并回顾」要求该会话预设挂了 `command-compact`。
 - 自造 teardown 收尾时，引擎重启前可能仍记着该会话。
+- 冷会话刚导入后，侧栏标题先显示 `Untitled`，等宿主的 title 投影加载完才变成真标题。
 
 <a name="sec-dev"></a>
 
 ## 开发
 
-~~~
+```text
 index.js            插件入口（导出 name / apply / inject）
 cordis.patch.yml    往宿主 loader 插入插件
 lib/core/           宿主侧逻辑：落盘、衰减、工具定义、脚本执行器
-lib/host/           宿主服务适配：12 个 HTTP 端点、能力探测、会话删除
+lib/host/           宿主服务适配：HTTP 端点、能力探测、会话导入/删除
 lib/client.js       设置页（React，注册到 settings.section）
-~~~
+```
 
 - 零运行时依赖，ESM，Node `>=18`。
 - 测试 `node --test test/*.test.mjs`（测试不进发布包）。
