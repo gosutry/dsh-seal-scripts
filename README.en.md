@@ -65,7 +65,7 @@ Add the package through the plugin manager (package name, local path, tarball or
 
 ```bash
 dsh plugin --profile web add dsh-seal-scripts          # latest from the registry
-dsh plugin --profile web add dsh-seal-scripts@0.6.2    # pin a version
+dsh plugin --profile web add dsh-seal-scripts@0.6.3    # pin a version
 dsh plugin --profile web add /path/to/dsh-seal-scripts # local dir, linked dependency
 ```
 
@@ -79,6 +79,8 @@ npx dsh plugin --profile web add dsh-seal-scripts
 `npm i` alone only fills `node_modules`; it does not register the plugin into a profile — the command above (or the plugin manager) does that by package name.
 
 Reload the profile after installing.
+
+Since 0.6.3 the data directory is `seal-scripts-data` instead of `session-memory`. On the first start after upgrading, the old directory is renamed in place (atomic rename, no copy) and `_migrated.json` is written into the new one. If both directories exist, only the new one is read and the old one is left untouched; if the rename fails, the old directory keeps being used — no empty new directory is created.
 
 Requires host `@deepseek-ai/dsh` `>=0.2.2-rc.1`, `<1.0.0` (peer, optional) and Node `>=18`.
 
@@ -119,7 +121,7 @@ The sealed copy is the one that ran, not a draft. Editing afterwards means resen
 #### Layout
 
 ```text
-$DSH_HOME/session-memory/toolSequence/
+$DSH_HOME/seal-scripts-data/toolSequence/
     _index.json             catalog: id, title, purpose, entry, params, steps, per-file sha256
     <id>/
         toolScript.json     manifest: script text, docs, hashes, provenance
@@ -211,7 +213,7 @@ Reviews are the raw material for sealing: when a session is compacted, **tool ca
 - Not produced for subagent sessions; nothing is even checked while "Automatic review" is off.
 - "Delete and review" triggers the chain explicitly; the session is deleted only after the review lands.
 - Compaction runs through the host command table (`/compact` by the command handler); the latest `compaction/summary` is split into a review.
-- Every failed step is logged to `session-memory/_compact-delete.log` (last 64 KB kept past 256 KB).
+- Every failed step is logged to `seal-scripts-data/_compact-delete.log` (last 64 KB kept past 256 KB).
 
 #### Four levels
 
@@ -283,14 +285,14 @@ The Sessions tab lists local sessions grouped by workspace, reading persisted lo
 #### Delete and review
 
 - Compress into a review, wait for extraction, verify, then delete; any failure keeps the session.
-- Every failed step is logged to `session-memory/_compact-delete.log`.
+- Every failed step is logged to `seal-scripts-data/_compact-delete.log`.
 - The review appears on the Reviews tab and decays by calendar day.
 
 <a name="sec-config"></a>
 
 ## Configuration
 
-There is one config file, `$DSH_HOME/session-memory/_options.json`, shared by all workspaces and applied immediately. Settings → **Tool (script) manager** → **Options** edits the same file.
+There is one config file, `$DSH_HOME/seal-scripts-data/_options.json`, shared by all workspaces and applied immediately. Settings → **Tool (script) manager** → **Options** edits the same file.
 
 | Tab | Contents |
 |---|---|
@@ -321,7 +323,7 @@ UI text, injected review bodies, diary reminders and the tool list follow the DS
 ## Data and backup
 
 ```text
-$DSH_HOME/session-memory/
+$DSH_HOME/seal-scripts-data/
     _options.json                 options
     _locale.json                  language
     _health.json                  last success/failure per workspace
@@ -334,7 +336,7 @@ $DSH_HOME/session-memory/
 ```
 
 - Workspace keys use the host's `sessions/` encoding: `/` becomes `-`, non-ASCII as `~XXXX`.
-- Backup = copy the whole `session-memory/`; migrate = same path on the new machine plus the same plugin.
+- Backup = copy the whole `seal-scripts-data/`; migrate = same path on the new machine plus the same plugin.
 - Uninstalling does not delete data.
 
 <a name="sec-compat"></a>
@@ -364,7 +366,7 @@ Session logs are multi-frame zstd, decoded frame by frame; the built-in decoder 
 - `steps` never chain automatically; use `calls`.
 - Reviews are produced only on compaction; the Reviews tab has a calendar filter but no full-text search.
 - Subagent sessions produce no reviews and get no diary reminders.
-- Import/export covers tool scripts only; reviews travel by copying `session-memory/`. Session zips are a separate import on the Sessions tab.
+- Import/export covers tool scripts only; reviews travel by copying `seal-scripts-data/`. Session zips are a separate import on the Sessions tab.
 - Delete-and-review requires the preset to provide `command-compact`.
 - Fallback teardown may leave the session remembered until the engine restarts.
 - A freshly imported cold session shows `Untitled` in the sidebar until the host's title projection loads.

@@ -64,7 +64,7 @@
 
 ```bash
 dsh plugin --profile web add dsh-seal-scripts          # 从 registry 装最新版
-dsh plugin --profile web add dsh-seal-scripts@0.6.2    # 钉版本
+dsh plugin --profile web add dsh-seal-scripts@0.6.3    # 钉版本
 dsh plugin --profile web add /path/to/dsh-seal-scripts # 本地目录，注册为 link 依赖
 ```
 
@@ -78,6 +78,8 @@ npx dsh plugin --profile web add dsh-seal-scripts
 单用 `npm i` 只把包放进 `node_modules`，不登记进 profile；还要上面那条（或插件管理器）按包名注册一次。
 
 装完重开 profile 才加载。
+
+0.6.3 起数据目录由 `session-memory` 改名为 `seal-scripts-data`。升级后首次启动会自动把旧目录整个改名过去（原子 rename，不复制），并在新目录写 `_migrated.json`；若新旧目录同时存在，只读新目录、旧目录原样不动；改名失败则继续读旧目录，不会新建空目录。
 
 要求：宿主 `@deepseek-ai/dsh` `>=0.2.2-rc.1`、`<1.0.0`（peer，不强制）；Node `>=18`。
 
@@ -118,7 +120,7 @@ npx dsh plugin --profile web add dsh-seal-scripts
 #### 产物
 
 ```text
-$DSH_HOME/session-memory/toolSequence/
+$DSH_HOME/seal-scripts-data/toolSequence/
     _index.json             名单：id、标题、用途、入口、参数、步骤、每文件 sha256
     <id>/
         toolScript.json     清单：脚本全文、docs、hashes、provenance
@@ -212,7 +214,7 @@ $DSH_HOME/session-memory/toolSequence/
 - 子代理会话不产生；「自动回顾」关着连检测都不做。
 - 「删除并回顾」主动触发：压缩 → 确认回顾落地 → 删会话。
 - 压缩走宿主命令表（`/compact` 由命令处理器执行），结束后取最新 `compaction/summary` 拆成回顾。
-- 每步失败写一行到 `session-memory/_compact-delete.log`（>256 KB 留最后 64 KB）。
+- 每步失败写一行到 `seal-scripts-data/_compact-delete.log`（>256 KB 留最后 64 KB）。
 
 #### 四级深度
 
@@ -286,14 +288,14 @@ $DSH_HOME/session-memory/toolSequence/
 #### 删除并回顾
 
 - 先压缩出回顾、等拆出、校验通过，才删会话；任一步失败都不删。
-- 每步失败写一行到 `session-memory/_compact-delete.log`。
+- 每步失败写一行到 `seal-scripts-data/_compact-delete.log`。
 - 生成的回顾出现在「回顾」页，按自然日衰减。
 
 <a name="sec-config"></a>
 
 ## 配置与设置页
 
-配置只有 `$DSH_HOME/session-memory/_options.json` 一份，改完立刻生效，所有工作区共用。设置 → **工具(脚本)管理** → **选项** 改的是同一份。
+配置只有 `$DSH_HOME/seal-scripts-data/_options.json` 一份，改完立刻生效，所有工作区共用。设置 → **工具(脚本)管理** → **选项** 改的是同一份。
 
 #### 设置页四个标签
 
@@ -328,7 +330,7 @@ $DSH_HOME/session-memory/toolSequence/
 ## 数据位置与备份
 
 ```text
-$DSH_HOME/session-memory/
+$DSH_HOME/seal-scripts-data/
     _options.json                 选项
     _locale.json                  语言
     _health.json                  每工作区最近一次成功/失败
@@ -341,7 +343,7 @@ $DSH_HOME/session-memory/
 ```
 
 - 工作区 key 与宿主 `sessions/` 同套编码：`/` 折成 `-`，非 ASCII 写成 `~XXXX`。
-- 备份 = 拷走整个 `session-memory/`；迁移 = 放到新机器同一位置，装同一插件。
+- 备份 = 拷走整个 `seal-scripts-data/`；迁移 = 放到新机器同一位置，装同一插件。
 - 卸载不删数据。
 
 <a name="sec-compat"></a>
@@ -371,7 +373,7 @@ $DSH_HOME/session-memory/
 - `steps` 不自动串跑，连跑用 `calls`。
 - 回顾只在压缩时产生；回顾页只有日历筛选，无全文搜索。
 - 子代理会话不产生回顾，不催日记。
-- 导入导出只管工具脚本，回顾靠拷 `session-memory/`；会话包是另一套导入（会话页）。
+- 导入导出只管工具脚本，回顾靠拷 `seal-scripts-data/`；会话包是另一套导入（会话页）。
 - 「删除并回顾」要求该会话预设挂了 `command-compact`。
 - 自造 teardown 收尾时，引擎重启前可能仍记着该会话。
 - 冷会话刚导入后，侧栏标题先显示 `Untitled`，等宿主的 title 投影加载完才变成真标题。
