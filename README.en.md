@@ -65,7 +65,7 @@ Add the package through the plugin manager (package name, local path, tarball or
 
 ```bash
 dsh plugin --profile web add dsh-seal-scripts          # latest from the registry
-dsh plugin --profile web add dsh-seal-scripts@0.6.1    # pin a version
+dsh plugin --profile web add dsh-seal-scripts@0.6.2    # pin a version
 dsh plugin --profile web add /path/to/dsh-seal-scripts # local dir, linked dependency
 ```
 
@@ -257,15 +257,17 @@ Installed only when "Automatic review" is on.
 
 ## Session management
 
-The Sessions tab lists local sessions grouped by workspace, reading persisted logs.
+The Sessions tab lists local sessions grouped by workspace, reading persisted logs. Each workspace starts collapsed; click its path to expand.
 
-- Each group header is a workspace path; empty workspaces are omitted.
+- Each group is a collapsible workspace header (collapsed by default) with the session count on the right; the selected workspace keeps a blue dot while collapsed; empty workspaces are omitted.
+- Import / Delete / Delete and review sit in the page header, so you do not have to scroll to the bottom of the list.
+- The whole settings section shares one page scrollbar; only the preview boxes (tool list, review) keep their own inner scrollbar.
 - One row per session: title (id placeholder in grey when not yet known), "Archived" badge when applicable.
 - Unreadable logs are reported at the top instead of being shown as empty sessions.
 
 #### Import
 
-- "Import" at the far left of the footer; pick `dsh-session-<id>.zip`. Disabled with a reason when the host cannot write zstd.
+- "Import" at the far left of the page header; pick `dsh-session-<id>.zip`. Disabled with a reason when the host cannot write zstd.
 - Dry run first (new id? branch?), write only after confirmation.
 - Log becomes "header frame + body frame", then `attachSession`; images and files land in the attachment store by sha256; the host list is notified, no restart needed.
 - A colliding id gets a new id, the original untouched; collisions inside the same workspace attach as a branch (`parentSession`).

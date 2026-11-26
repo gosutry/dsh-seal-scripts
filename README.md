@@ -64,7 +64,7 @@
 
 ```bash
 dsh plugin --profile web add dsh-seal-scripts          # 从 registry 装最新版
-dsh plugin --profile web add dsh-seal-scripts@0.6.1    # 钉版本
+dsh plugin --profile web add dsh-seal-scripts@0.6.2    # 钉版本
 dsh plugin --profile web add /path/to/dsh-seal-scripts # 本地目录，注册为 link 依赖
 ```
 
@@ -258,17 +258,19 @@ $DSH_HOME/session-memory/toolSequence/
 
 ## 会话管理
 
-会话页按工作区分组列出本机会话，列表读的是落盘日志，不用打开会话也能看。
+会话页按工作区分组列出本机会话，列表读的是落盘日志，不用打开会话也能看；每个工作区默认收起，点路径展开。
 
 #### 列表
 
-- 每段开头是工作区路径；空工作区不占位置。
+- 每段是一个可折叠的工作区列表头（默认收起），右边是会话数；选中的工作区在收起时保留蓝点；空工作区不占位置。
+- 导入 / 删除 / 删除并回顾三颗按钮放在页头，不用滚到列表底部。
+- 整个设置区共用一条页面滑条；只有预览框（自创工具、回顾）保留自己的内部滑条。
 - 每条一行：标题（还没有标题时用 id 占位、灰色显示），归档的带「已归档」徽章。
 - 日志解不开时列表顶上一句说明，不把读不出的会话显示成「空会话」。
 
 #### 导入
 
-- 页脚最左边「导入」，选 `dsh-session-<id>.zip`；宿主写不了 zstd 时按钮禁用并说明原因。
+- 页头最左边「导入」，选 `dsh-session-<id>.zip`；宿主写不了 zstd 时按钮禁用并说明原因。
 - 先预演（会不会换新 id、要不要挂分支），确认才落盘。
 - 日志压成「首帧户口本 + 正文帧」后 `attachSession` 登记；图与文件按 sha256 落附件库；落盘后通知宿主列表新增，不用重启。
 - 同 id 撞上已有会话就换新 id，原来那条一个字节都不动；同工作区的撞号挂成原会话分支（`parentSession`）。
