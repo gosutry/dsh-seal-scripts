@@ -270,10 +270,10 @@ The Sessions tab lists local sessions grouped by workspace, reading persisted lo
 #### Import
 
 - "Import" at the far left of the page header; pick `dsh-session-<id>.zip`. Disabled with a reason when the host cannot write zstd.
-- Dry run first (new id? branch?), write only after confirmation.
-- Log becomes "header frame + body frame", then `attachSession`; images and files land in the attachment store by sha256; the host list is notified, no restart needed.
-- A colliding id gets a new id, the original untouched; collisions inside the same workspace attach as a branch (`parentSession`).
-- `workspace.json` and the directory registry are backed up into `会话导入备份-<time>/` before writing.
+- `dryRun` preview (new id? branch?) → write only on confirm.
+- Written: log (header frame + body frame), attachment store (sha256; bytes + `files/` link), workspace entry.
+- Colliding id → new id, original untouched; same workspace → branch (`parentSession`).
+- Landed → host list notified, no restart; failure rolls back only "workspace refused to attach", the attachment store is not reclaimed.
 
 #### Delete
 
